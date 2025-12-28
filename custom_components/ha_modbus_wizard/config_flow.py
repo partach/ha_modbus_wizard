@@ -4,7 +4,7 @@ from typing import Any
 import serial.tools.list_ports
 import voluptuous as vol
 from pymodbus.exceptions import ModbusException
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
@@ -27,6 +27,8 @@ from .const import (
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
     DEFAULT_BYTESIZE,
+    CONF_FIRST_REG,
+    CONF_FIRST_REG_SIZE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,16 +48,18 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
         if user_input is None:
             return self.async_show_form(
                 step_id="user",
-                data_schema=cv.Schema({
-                    cv.Required(CONF_CONNECTION_TYPE, default=CONNECTION_TYPE_SERIAL): selector.SelectSelector(
+                data_schema=vol.Schema({
+                    vol.Required(CONF_CONNECTION_TYPE, default=CONNECTION_TYPE_SERIAL): selector.SelectSelector(
                         selector.SelectSelectorConfig(options=[CONNECTION_TYPE_SERIAL, CONNECTION_TYPE_TCP])
                     ),
-                    cv.Required(CONF_NAME, default="Modbus Hub"): cv.string,
-                    cv.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): cv.positive_int,
+                    vol.Required(CONF_NAME, default="Modbus Hub"): vol.string,
+                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.positive_int,
+                    vol.Required(CONF_FIRST_REG, default=0): vol.positive_int,
+                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.positive_int,
                 }),
             )
-
         conn_type = user_input[CONF_CONNECTION_TYPE]
+        self.user_input=user_input
         if conn_type == CONNECTION_TYPE_SERIAL:
             return await self.async_step_serial(user_input)
         else:
@@ -119,9 +123,10 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                     CONF_PARITY: user_input[CONF_PARITY],
                     CONF_STOPBITS: user_input[CONF_STOPBITS],
                     CONF_BYTESIZE: user_input[CONF_BYTESIZE],
-                    CONF_INVERTER_MODEL: DEFAULT_INVERTER_MODEL,
+                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
+                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
-                
+                self.user_input.update(final_data)
                 await self._async_test_serial_connection(final_data)
 
                 return self.async_create_entry(
@@ -167,8 +172,10 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
                     CONF_SLAVE_ID: user_input[CONF_SLAVE_ID],
-                    CONF_INVERTER_MODEL: DEFAULT_INVERTER_MODEL,
+                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
+                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
+                self.user_input.update(final_data)                
 
                 await self._async_test_tcp_connection(final_data)
 
@@ -206,9 +213,10 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
             await client.connect()
             if not client.connected:
                 raise ConnectionError("Failed to open serial port")
-    
+            test_register_value= self.user_input[CONF_FIRST_REG]    
+            reg_size = self.user_input[CONF_FIRST_REG_SIZE]
             result = await client.read_holding_registers(
-                address=DEFAULT_FIRST_REG, count=1, device_id=data[CONF_SLAVE_ID]
+                address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
             )
             
             if result.isError():
@@ -233,13 +241,15 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                 port=data[CONF_PORT],
                 timeout=5,
             )
-    
+            reg_size = 
             await client.connect()
             if not client.connected:
                 raise ConnectionError(f"Failed to connect to {data[CONF_HOST]}:{data[CONF_PORT]}")
     
+            test_register_value= self.user_input[CONF_FIRST_REG]    
+            reg_size = self.user_input[CONF_FIRST_REG_SIZE]
             result = await client.read_holding_registers(
-                address=DEFAULT_FIRST_REG, count=1, device_id=data[CONF_SLAVE_ID]
+                address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
             )
     
             if result.isError():
