@@ -153,7 +153,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_setup_services(hass: HomeAssistant) -> None:
     async def handle_write_register(call: ServiceCall):
-        entity_id = call.data.get("entity_id")
+    #    entity_id = call.data.get("entity_id")  # not used yet
         address = call.data["address"]
         value = call.data["value"]
         size = call.data.get("size", 1)
