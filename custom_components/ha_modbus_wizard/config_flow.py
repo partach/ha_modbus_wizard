@@ -18,7 +18,7 @@ from .const import (
     CONF_SLAVE_ID,
     CONF_BAUDRATE,
     CONF_PARITY,
-    CONF_NAME
+    CONF_NAME,
     CONF_STOPBITS,
     CONF_BYTESIZE,
     DEFAULT_SLAVE_ID,
