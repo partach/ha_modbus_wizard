@@ -1,0 +1,35 @@
+write_register:
+  name: Write Register
+  description: Write a value to a specific Modbus register.
+  target:
+    entity:
+      integration: modbus_wizard
+  fields:
+    address:
+      name: Register Address
+      description: Modbus register address.
+      required: true
+      example: 100
+      selector:
+        number:
+          mode: box
+          min: 0
+          max: 65535
+          step: 1
+    value:
+      name: Value
+      description: Value to write (integer or float based on register type).
+      required: true
+      selector:
+        text:
+    size:
+      name: Size
+      description: Number of registers to write (1-4).
+      required: false
+      default: 1
+      selector:
+        number:
+          mode: box
+          min: 1
+          max: 4
+          step: 1
