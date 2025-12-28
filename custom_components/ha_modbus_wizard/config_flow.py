@@ -42,6 +42,11 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
         self._connection_type = None
         self._user_input = {}
     
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry):
+        """Get the options flow for this handler."""
+        return ModbusWizardOptionsFlow(config_entry)
        
     async def async_step_user(self, user_input=None):
         """Handle initial step."""
