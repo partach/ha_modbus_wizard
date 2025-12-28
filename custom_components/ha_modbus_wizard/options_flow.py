@@ -1,7 +1,7 @@
 """Options flow for Modbus Wizard."""
 from homeassistant import config_entries
 from homeassistant.helpers import selector
-import vol as cv
+import voluptuous as vol
 
 class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow."""
@@ -16,7 +16,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             return self.async_show_form(
                 step_id="init",
                 description_placeholders={"registers": str(len(self.registers))},
-                data_schema=cv.Schema({}),
+                data_schema=vol.Schema({}),
             )
         
         # Redirect to add_register
@@ -33,21 +33,21 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="add_register",
-            data_schema=cv.Schema({
-                cv.Required("name"): cv.string,
-                cv.Required("address"): cv.positive_int,
-                cv.Required("size", default=1): selector.NumberSelector(
+            data_schema=vol.Schema({
+                vol.Required("name"): vol.string,
+                vol.Required("address"): vol.positive_int,
+                vol.Required("size", default=1): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=4)
                 ),
-                cv.Required("data_type", default="uint"): selector.SelectSelector(
+                vol.Required("data_type", default="uint"): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=["uint", "int", "float", "string"])
                 ),
-                cv.Optional("device_class"): selector.SelectSelector(
+                vol.Optional("device_class"): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=["voltage", "current", "power", "energy", "battery"])  # Add more
                 ),
-                cv.Required("rw", default="read"): selector.SelectSelector(
+                vol.Required("rw", default="read"): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=["read", "write"])
                 ),
-                cv.Optional("unit"): cv.string,
+                vol.Optional("unit"): vol.string,
             }),
         )
