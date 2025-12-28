@@ -10,7 +10,7 @@ CONNECTION_TYPE_TCP = "tcp"
 CONF_SLAVE_ID = "slave_id"
 CONF_CONNECTION_TYPE = "connection_type"
 CONF_NAME = "name"
-
+CONF_FIRST_REG = "first register"
 # Serial settings
 CONF_SERIAL_PORT = "serial_port"
 CONF_BAUDRATE = "baudrate"
