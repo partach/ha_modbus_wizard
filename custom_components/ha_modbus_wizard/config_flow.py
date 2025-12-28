@@ -241,7 +241,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                 port=data[CONF_PORT],
                 timeout=5,
             )
-            reg_size = 
             await client.connect()
             if not client.connected:
                 raise ConnectionError(f"Failed to connect to {data[CONF_HOST]}:{data[CONF_PORT]}")
