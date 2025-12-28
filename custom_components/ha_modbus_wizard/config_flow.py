@@ -59,7 +59,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                 }),
             )
         conn_type = user_input[CONF_CONNECTION_TYPE]
-        self.user_input=user_input
+        self._user_input=user_input.copy()
         if conn_type == CONNECTION_TYPE_SERIAL:
             return await self.async_step_serial(user_input)
         else:
@@ -85,7 +85,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_NAME, default="Felicity Inverter"): str,
+                vol.Required(CONF_NAME, default=self._user_input.get(CONF_NAME, "Modbus Hub")): str,
                 vol.Required(CONF_SERIAL_PORT): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=port_options,
@@ -123,15 +123,13 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                     CONF_PARITY: user_input[CONF_PARITY],
                     CONF_STOPBITS: user_input[CONF_STOPBITS],
                     CONF_BYTESIZE: user_input[CONF_BYTESIZE],
-                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
-                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
-                self.user_input.update(final_data)
-                await self._async_test_serial_connection(final_data)
+                self._user_input.update(final_data)
+                await self._async_test_serial_connection(self._user_input)
 
                 return self.async_create_entry(
                     title=user_input[CONF_NAME],
-                    data=final_data,
+                    data=self._user_input,
                     options=self._get_default_options(),
                 )
 
@@ -143,7 +141,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                 errors["base"] = "read_error"
             except Exception as err:
                 errors["base"] = "unknown"
-                _LOGGER.exception("Unexpected error during Felicity serial setup: %s", err)
+                _LOGGER.exception("Unexpected error during modbus serial setup: %s", err)
 
         return self.async_show_form(step_id="serial", data_schema=data_schema, errors=errors)
 
@@ -153,7 +151,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
 
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_NAME, default="Felicity Inverter"): str,
+                vol.Required(CONF_NAME, default=self._user_input.get(CONF_NAME, "Modbus Hub")): str,
                 vol.Required(CONF_HOST): str,
                 vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=65535)
@@ -172,16 +170,14 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
                     CONF_SLAVE_ID: user_input[CONF_SLAVE_ID],
-                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
-                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
-                self.user_input.update(final_data)                
+                self._user_input.update(final_data)                
 
-                await self._async_test_tcp_connection(final_data)
+                await self._async_test_tcp_connection(self._user_input)
 
                 return self.async_create_entry(
                     title=user_input[CONF_NAME],
-                    data=final_data,
+                    data=self._user_input,
                     options=self._get_default_options(),
                 )
 
@@ -193,12 +189,12 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                 errors["base"] = "read_error"
             except Exception as err:
                 errors["base"] = "unknown"
-                _LOGGER.exception("Unexpected error during Felicity TCP setup: %s", err)
+                _LOGGER.exception("Unexpected error during modbus TCP setup: %s", err)
 
         return self.async_show_form(step_id="tcp", data_schema=data_schema, errors=errors)
 
     async def _async_test_serial_connection(self, data: dict[str, Any]) -> None:
-        """Test serial connection to the Felicity meter."""
+        """Test serial connection to the modbus device."""
         client = None
         try:
             client = AsyncModbusSerialClient(
@@ -213,8 +209,8 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
             await client.connect()
             if not client.connected:
                 raise ConnectionError("Failed to open serial port")
-            test_register_value= self.user_input[CONF_FIRST_REG]    
-            reg_size = self.user_input[CONF_FIRST_REG_SIZE]
+            test_register_value= self._user_input[CONF_FIRST_REG]    
+            reg_size = self._user_input[CONF_FIRST_REG_SIZE]
             result = await client.read_holding_registers(
                 address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
             )
@@ -222,7 +218,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
             if result.isError():
                 raise ModbusException(f"Modbus read error: {result}")
                 
-            if len(result.registers) != 1:
+            if len(result.registers) != reg_size:
                 raise ValueError("Invalid response: expected 1 register")
     
         finally:
@@ -233,20 +229,20 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
                     _LOGGER.debug("Error closing Modbus Serial client: %s", err)
 
     async def _async_test_tcp_connection(self, data: dict[str, Any]) -> None:
-        """Test TCP connection to the Felicity meter."""
+        """Test TCP connection to the modbus device."""
         client = None
         try:
             client = AsyncModbusTcpClient(
                 host=data[CONF_HOST],
                 port=data[CONF_PORT],
-                timeout=5,
+                timeout=3,
             )
             await client.connect()
             if not client.connected:
                 raise ConnectionError(f"Failed to connect to {data[CONF_HOST]}:{data[CONF_PORT]}")
     
-            test_register_value= self.user_input[CONF_FIRST_REG]    
-            reg_size = self.user_input[CONF_FIRST_REG_SIZE]
+            test_register_value= self._user_input[CONF_FIRST_REG]    
+            reg_size = self._user_input[CONF_FIRST_REG_SIZE]
             result = await client.read_holding_registers(
                 address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
             )
@@ -254,7 +250,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
             if result.isError():
                 raise ModbusException(f"Modbus read error: {result}")
     
-            if len(result.registers) != 1:
+            if len(result.registers) != reg_size:
                 # Note: Testing 1 register here for consistency with serial test
                 raise ValueError("Invalid response: expected 1 register")
     
