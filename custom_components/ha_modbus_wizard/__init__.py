@@ -93,11 +93,11 @@ async def async_register_card(hass: HomeAssistant, entry: ConfigEntry):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Modbus Wizard from a config entry."""
     config = entry.data
-    connection_type = config[CONF_CONNECTION_TYPE]
+    connection_type = config.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_SERIAL)
     
     # Get or create shared hub
     hubs = hass.data.setdefault(DOMAIN, {}).setdefault("hubs", {})
-    
+    update_interval = entry.options.get("update_interval", 10)
     if connection_type == CONNECTION_TYPE_SERIAL:
         port = config[CONF_SERIAL_PORT]
         baudrate = config.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)
@@ -124,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client=hub.client,
         slave_id=config[CONF_SLAVE_ID],
         config_entry=entry,
+        update_interval=update_interval,
     )
     
     # Store config and hub_key
@@ -143,8 +144,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if "services_setup" not in hass.data[DOMAIN]:
         await async_setup_services(hass)
         hass.data[DOMAIN]["services_setup"] = True
-    await async_install_frontend_resource()
-    await async_register_card()
+
+    #copy card and register it
+    await async_install_frontend_resource(hass)
+    await async_register_card(hass, entry)
+    
     return True
 
 async def async_setup_services(hass: HomeAssistant) -> None:
@@ -187,8 +191,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 class ModbusSerialHub:
     """Manages serial connection."""
-    def __init__(self, hass, port, baudrate, parity, stopbits, bytesize):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        port: str,
+        baudrate: int,
+        parity: str,
+        stopbits: int,
+        bytesize: int,
+    ):
+        """Initialize the serial hub."""
         self.hass = hass
+        self.port = port
+        self.baudrate = baudrate
+        self.parity = parity
+        self.stopbits = stopbits
+        self.bytesize = bytesize
         self.client = AsyncModbusSerialClient(
             port=port,
             baudrate=baudrate,
@@ -199,13 +217,22 @@ class ModbusSerialHub:
         )
 
     async def close(self):
-        if self.client.connected:
-            self.client.close()
+        """Close the connection safely."""
+        if self.client is not None:
+            if self.client.connected:
+                try:
+                    self.client.close()
+                except Exception as err:
+                    _LOGGER.exception("Unexpected error closing modbus connection for serial: %s", err)
+            self.client = None
 
 class ModbusTcpHub:
     """Manages TCP connection."""
-    def __init__(self, hass, host, port):
+    def __init__(self, hass: HomeAssistant, host: str, port: int):
+        """Initialize the TCP hub."""
         self.hass = hass
+        self.host = host
+        self.port = port
         self.client = AsyncModbusTcpClient(
             host=host,
             port=port,
@@ -213,5 +240,11 @@ class ModbusTcpHub:
         )
 
     async def close(self):
-        if self.client.connected:
-            self.client.close()
+        """Close the connection safely."""
+        if self.client is not None:
+            if self.client.connected:
+                try:
+                    self.client.close()
+                except Exception as err:
+                    _LOGGER.exception("Unexpected error closing modbus connection for tcp: %s", err)
+            self.client = None
