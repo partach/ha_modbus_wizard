@@ -28,6 +28,66 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT]
 
+async def async_install_frontend_resource(hass: HomeAssistant):
+    """Ensure the frontend JS file is copied to the www/community folder."""
+    
+    def install():
+        # Source path: custom_components/ha_felicity/frontend/ha_felicity.js
+        source_path = hass.config.path("custom_components", DOMAIN, "frontend", "ha_modbus_wizard.js")
+        
+        # Target path: www/community/ha_felicity/
+        target_dir = hass.config.path("www", "community", DOMAIN)
+        target_path = os.path.join(target_dir, "ha_modbus_wizard.js")
+
+        try:
+            # 1. Ensure the destination directory exists
+            if not os.path.exists(target_dir):
+                _LOGGER.debug("Creating directory: %s", target_dir)
+                os.makedirs(target_dir, exist_ok=True)
+
+            # 2. Check if source exists and copy
+            if os.path.exists(source_path):
+                # Using copy2 to preserve metadata (timestamps)
+                shutil.copy2(source_path, target_path)
+                _LOGGER.info("Updated frontend resource: %s", target_path)
+            else:
+                _LOGGER.warning("Frontend source file missing at %s", source_path)
+                
+        except Exception as err:
+            _LOGGER.error("Failed to install frontend resource: %s", err)
+
+    # Offload the blocking file operations to the executor thread
+    await hass.async_add_executor_job(install)
+
+async def async_register_card(hass: HomeAssistant, entry: ConfigEntry):
+    """Register the custom card as a Lovelace resource."""
+    lovelace_data = hass.data.get("lovelace")
+    if not lovelace_data:
+        _LOGGER.debug("Unable to get lovelace data (new api 2026.2)")
+        return  # YAML mode or Lovelace not loaded
+
+    resources = lovelace_data.resources
+    if not resources:
+        _LOGGER.debug("Unable to get resources (new api 2026.2)")
+        return  # YAML mode or not loaded
+
+    if not resources.loaded:
+        await resources.async_load()
+
+    card_url = f"/hacsfiles/{DOMAIN}/{DOMAIN}.js"
+
+    # Check if already registered
+    for item in resources.async_items():
+        if item["url"] == card_url:
+            _LOGGER.debug("Card already registered: %s", card_url)
+            return  # already there
+
+    await resources.async_create_item({
+        "res_type": "module",
+        "url": card_url,
+    })
+    _LOGGER.debug("Card registered: %s", card_url)
+    
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Modbus Wizard from a config entry."""
     config = entry.data
@@ -81,7 +141,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if "services_setup" not in hass.data[DOMAIN]:
         await async_setup_services(hass)
         hass.data[DOMAIN]["services_setup"] = True
-
+    await async_install_frontend_resource()
+    await async_register_card()
     return True
 
 async def async_setup_services(hass: HomeAssistant) -> None:
