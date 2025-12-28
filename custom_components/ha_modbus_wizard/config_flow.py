@@ -29,6 +29,8 @@ from .const import (
     DEFAULT_BYTESIZE,
 )
 
+_LOGGER = logging.getLogger(__name__)
+
 class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
     """Handle config flow."""
 
