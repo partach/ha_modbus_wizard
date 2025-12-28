@@ -1,4 +1,6 @@
 """The Modbus Wizard integration."""
+import os
+import shutil
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -32,10 +34,10 @@ async def async_install_frontend_resource(hass: HomeAssistant):
     """Ensure the frontend JS file is copied to the www/community folder."""
     
     def install():
-        # Source path: custom_components/ha_felicity/frontend/ha_felicity.js
+        # Source path: custom_components/ha_felicity/frontend/
         source_path = hass.config.path("custom_components", DOMAIN, "frontend", "ha_modbus_wizard.js")
         
-        # Target path: www/community/ha_felicity/
+        # Target path: www/community/
         target_dir = hass.config.path("www", "community", DOMAIN)
         target_path = os.path.join(target_dir, "ha_modbus_wizard.js")
 
