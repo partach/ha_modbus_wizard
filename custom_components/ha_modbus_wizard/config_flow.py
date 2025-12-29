@@ -224,7 +224,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="tcp", data_schema=data_schema, errors=errors)
 
     async def _async_test_serial_connection(self, data: dict[str, Any]) -> None:
-        """Test serial connection to the modbus device."""
+        """Test serial connection and try reading the first register with all possible types."""
         client = None
         try:
             client = AsyncModbusSerialClient(
@@ -235,23 +235,52 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
                 timeout=5,
             )
-            
+    
             await client.connect()
             if not client.connected:
                 raise ConnectionError("Failed to open serial port")
-            test_register_value= self._user_input[CONF_FIRST_REG]    
-            reg_size = self._user_input[CONF_FIRST_REG_SIZE]
-            result = await client.read_holding_registers(
-                address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
-            )
-            
-            if result.isError():
-                raise ModbusException(f"Modbus read error: {result}")
-                
-            if len(result.registers) != reg_size:
-                raise ValueError(f"Invalid response: expected {reg_size} register(s), got {len(result.registers)} register(s)")
+    
+            address = self._user_input[CONF_FIRST_REG]
+            count = self._user_input[CONF_FIRST_REG_SIZE]
+            slave_id = data[CONF_SLAVE_ID]
+    
+            # Try in order of most common → least common
+            read_methods = [
+                ("holding registers", client.read_holding_registers),
+                ("input registers", client.read_input_registers),
+                ("coils", client.read_coils),
+                ("discrete inputs", client.read_discrete_inputs),
+            ]
+    
+            success = False
+            for name, method in read_methods:
+                try:
+                    if name in ("coils", "discrete inputs"):
+                        # For bits, count is number of bits
+                        result = await method(address=address, count=count, slave=slave_id)
+                        if not result.isError() and hasattr(result, "bits"):
+                            if len(result.bits) >= count:  # At least the requested bits
+                                success = True
+                                break
+                    else:
+                        # For registers (words)
+                        result = await method(address=address, count=count, slave=slave_id)
+                        if not result.isError() and hasattr(result, "registers"):
+                            if len(result.registers) == count:
+                                success = True
+                                break
+                except Exception as inner_err:
+                    _LOGGER.debug("Test read failed for %s at addr %d: %s", name, address, inner_err)
+                    continue  # Try next type
+    
+            if not success:
+                raise ValueError(
+                    f"Could not read {count} value(s) from address {address} using any register type "
+                    "(tried holding, input, coils, discrete). Check address, size, or slave ID."
+                )
+    
         finally:
-            if client is not None:
+            if client:
                 try:
                     client.close()
                 except Exception as err:
@@ -268,23 +297,50 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             await client.connect()
             if not client.connected:
-                raise ConnectionError(f"Failed to connect to {data[CONF_HOST]}:{data[CONF_PORT]}")
+                raise ConnectionError("Failed to open serial port")
     
-            test_register_value= self._user_input[CONF_FIRST_REG]    
-            reg_size = self._user_input[CONF_FIRST_REG_SIZE]
-            result = await client.read_holding_registers(
-                address=test_register_value, count=reg_size, device_id=data[CONF_SLAVE_ID]
-            )
+            address = self._user_input[CONF_FIRST_REG]
+            count = self._user_input[CONF_FIRST_REG_SIZE]
+            slave_id = data[CONF_SLAVE_ID]
     
-            if result.isError():
-                raise ModbusException(f"Modbus read error: {result}")
+            # Try in order of most common → least common
+            read_methods = [
+                ("holding registers", client.read_holding_registers),
+                ("input registers", client.read_input_registers),
+                ("coils", client.read_coils),
+                ("discrete inputs", client.read_discrete_inputs),
+            ]
     
-            if len(result.registers) != reg_size:
-                raise ValueError(f"Invalid response: expected {reg_size} register(s), got {len(result.registers)} register(s)")
+            success = False
+            for name, method in read_methods:
+                try:
+                    if name in ("coils", "discrete inputs"):
+                        # For bits, count is number of bits
+                        result = await method(address=address, count=count, slave=slave_id)
+                        if not result.isError() and hasattr(result, "bits"):
+                            if len(result.bits) >= count:  # At least the requested bits
+                                success = True
+                                break
+                    else:
+                        # For registers (words)
+                        result = await method(address=address, count=count, slave=slave_id)
+                        if not result.isError() and hasattr(result, "registers"):
+                            if len(result.registers) == count:
+                                success = True
+                                break
+                except Exception as inner_err:
+                    _LOGGER.debug("Test read failed for %s at addr %d: %s", name, address, inner_err)
+                    continue  # Try next type
+    
+            if not success:
+                raise ValueError(
+                    f"Could not read {count} value(s) from address {address} using any register type "
+                    "(tried holding, input, coils, discrete). Check address, size, or slave ID."
+                )
     
         finally:
-            if client is not None:
+            if client:
                 try:
                     client.close()
                 except Exception as err:
-                    _LOGGER.debug("Error closing Modbus TCP client: %s", err)
+                    _LOGGER.debug("Error closing Modbus Serial client: %s", err)
