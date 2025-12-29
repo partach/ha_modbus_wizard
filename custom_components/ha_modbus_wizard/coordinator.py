@@ -73,30 +73,43 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             return None
             
     async def _async_update_data(self) -> dict:
-        """Fetch data from registers in options."""
-        if not await self._async_connect():
-            raise UpdateFailed("Cannot connect")
-
-        registers = self.config_entry.options.get("registers", [])
         new_data = {}
-
+    
+        registers = self.config_entry.options.get("registers", [])
         for reg in registers:
+            key = reg["name"].lower().replace(" ", "_")
             address = reg["address"]
             size = reg["size"]
-            key = reg["name"].lower().replace(" ", "_")
-            
+            reg_type = reg["register_type"]
+    
             try:
-                result = await self.client.read_holding_registers(address, size, device_id=self.slave_id)
-                if result.isError():
+                if reg_type == "holding":
+                    result = await self.client.read_holding_registers(address, size, slave=self.slave_id)
+                elif reg_type == "input":
+                    result = await self.client.read_input_registers(address, size, slave=self.slave_id)
+                elif reg_type == "coil":
+                    result = await self.client.read_coils(address, size, slave=self.slave_id)
+                elif reg_type == "discrete":
+                    result = await self.client.read_discrete_inputs(address, size, slave=self.slave_id)
+                else:
+                    _LOGGER.warning("Invalid register type %s for %s", reg_type, key)
                     continue
-                
-                raw = 0  # Decode based on data_type
-                if reg["data_type"] == "uint" and size == 1:
-                    raw = result.registers[0]
-                # Add more decoding...
-                
-                new_data[key] = raw
+    
+                if result.isError():
+                    _LOGGER.warning("Read error for %s at %d", key, address)
+                    continue
+    
+                # Decode based on data_type (your existing logic, e.g., uint/int/float)
+                if reg_type in ("holding", "input"):
+                    values = result.registers  # words
+                else:
+                    values = result.bits  # bits (for coil/discrete)
+    
+                # Apply decoding (expand as needed for bits vs words)
+                decoded = self._decode_value(values, reg["data_type"], size)
+                new_data[key] = decoded
+    
             except Exception as err:
-                _LOGGER.warning("Read error for %s: %s", key, err)
-
+                _LOGGER.warning("Update failed for %s: %s", key, err)
+    
         return new_data
