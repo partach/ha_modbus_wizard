@@ -42,6 +42,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 vol.Required("register_type", default="holding"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=[
+                            "auto", # automatically try to get a match.
                             "holding",    # read/write words
                             "input",      # read-only words
                             "coil",       # read/write bits
