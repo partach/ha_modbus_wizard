@@ -29,7 +29,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         self.slave_id = slave_id
         self.config_entry = config_entry
         self.connected = False
-        self.self._resolved_register_types = {}
         self.update_interval = update_interval
 
     async def _async_connect(self) -> bool:
@@ -77,21 +76,25 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             
     async def _async_update_data(self) -> dict:
         """Fetch latest data from all configured registers."""
-        new_data = {}
-        registers = list(self.config_entry.options.get("registers", []))  # Copy for potential modification
+        if not await self._async_connect():
+            raise UpdateFailed("Could not connect to Modbus device")
     
-        for idx, reg in enumerate(registers):
+        new_data = {}
+        registers = self.config_entry.options.get("registers", [])
+        updated_registers = [dict(reg) for reg in registers]  # Copy for modification
+        options_changed = False
+    
+        for idx, reg in enumerate(updated_registers):
             key = reg["name"].lower().replace(" ", "_")
             address = reg["address"]
             count = reg.get("size", 1)
             reg_type = reg.get("register_type", "holding")
     
-            result = None
-    
             try:
+                result = None
+    
                 # === AUTO DETECTION ===
                 if reg_type == "auto":
-                    # Try in order of most common → least common
                     methods = [
                         ("holding", self.client.read_holding_registers),
                         ("input", self.client.read_input_registers),
@@ -102,88 +105,65 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     success_type = None
                     for name, method in methods:
                         try:
-                            if name in ("coil", "discrete"):
-                                result = await method(address=address, count=count, device_id=self.slave_id)
-                            else:
-                                result = await method(address=address, count=count, device_id=self.slave_id)
-    
+                            result = await method(address=address, count=count, device_id=self.slave_id)
                             if not result.isError():
                                 success_type = name
                                 break
                         except Exception:
-                            result = None
                             continue
     
                     if success_type:
                         reg_type = success_type
-    
-                        # Permanently update the register type in config if it was "auto"
-                        if registers[idx]["register_type"] == "auto":
-                            registers[idx]["register_type"] = success_type
-                            # Update the entry options in HA
-                            self.hass.config_entries.async_update_entry(
-                                self.config_entry,
-                                options={**self.config_entry.options, "registers": registers}
-                            )
-                            _LOGGER.info(
-                                "Auto-detected and saved register type '%s' for '%s' (address %d)",
-                                success_type,
-                                reg["name"],
-                                address,
-                            )
-                    else:
-                        _LOGGER.warning(
-                            "Auto-detect failed for register '%s' (address %d, size %d)",
-                            reg["name"],
-                            address,
-                            count,
+                        updated_registers[idx]["register_type"] = success_type
+                        options_changed = True
+                        _LOGGER.info(
+                            "Auto-detected and saved '%s' for register '%s' (addr %d)",
+                            success_type, reg["name"], address
                         )
+                    else:
+                        _LOGGER.warning("Auto-detect failed for '%s' (addr %d)", reg["name"], address)
                         continue  # Skip this register
     
-                # === DIRECT READ USING FINAL reg_type ===
+                # === DIRECT READ ===
                 if result is None:
                     if reg_type == "holding":
-                        result = await self.client.read_holding_registers(address, count, device_id=self.slave_id)
+                        result = await self.client.read_holding_registers(address=address, count=count, device_id=self.slave_id)
                     elif reg_type == "input":
-                        result = await self.client.read_input_registers(address, count, device_id=self.slave_id)
+                        result = await self.client.read_input_registers(address=address, count=count, device_id=self.slave_id)
                     elif reg_type == "coil":
-                        result = await self.client.read_coils(address, count, device_id=self.slave_id)
+                        result = await self.client.read_coils(address=address, count=count, device_id=self.slave_id)
                     elif reg_type == "discrete":
-                        result = await self.client.read_discrete_inputs(address, count, device_id=self.slave_id)
+                        result = await self.client.read_discrete_inputs(address=address, count=count, device_id=self.slave_id)
                     else:
-                        _LOGGER.warning("Invalid register type '%s' for '%s'", reg_type, reg["name"])
                         continue
     
                 if result.isError():
-                    _LOGGER.debug(
-                        "Read error for '%s' (%s, addr %d): %s",
-                        reg["name"],
-                        reg_type,
-                        address,
-                        result,
-                    )
+                    _LOGGER.debug("Read failed for '%s' (%s): %s", reg["name"], reg_type, result)
                     continue
     
-                # === EXTRACT VALUES ===
+                # === EXTRACT AND DECODE ===
                 if reg_type in ("coil", "discrete"):
                     values = result.bits[:count]
                 else:
-                    values = result.registers
-    
-                if len(values) < count:
-                    _LOGGER.warning(
-                        "Short read for '%s': expected %d value(s), got %d",
-                        reg["name"],
-                        count,
-                        len(values),
-                    )
+                    values = result.registers[:count]  # Safe slice
+                if len(values) == 0:
                     continue
     
-                # === DECODE VALUE ===
-                decoded = self._decode_value(values, reg["data_type"], count)
+                decoded = self._decode_value(values, reg.get("data_type", "uint"), len(values))
                 new_data[key] = decoded
     
             except Exception as err:
-                _LOGGER.warning("Unexpected error reading register '%s': %s", reg["name"], err)
+                _LOGGER.warning("Error updating register '%s': %s", reg["name"], err)
+                continue
+    
+        # Save auto-detected types
+        if options_changed:
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                options={**self.config_entry.options, "registers": updated_registers}
+            )
+    
+        if not new_data:
+            raise UpdateFailed("No registers could be read from device")
     
         return new_data
