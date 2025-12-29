@@ -152,23 +152,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_setup_services(hass: HomeAssistant) -> None:
+
+    def _get_hub():
+      # Single hub assumption, needs an update!
+      return next(iter(hass.data[DOMAIN].values()))
+    # decide what to do with this one or top one.
+    def _get_hub_from_call(hass, call):
+        entity_id = next(iter(call.data.get("entity_id", [])), None)
+        if not entity_id:
+            raise HomeAssistantError("No entity_id provided")
+    
+        entity = hass.states.get(entity_id)
+        if not entity:
+            raise HomeAssistantError("Entity not found")
+    
+        entry_id = entity.attributes.get("config_entry_id")
+        if not entry_id:
+            raise HomeAssistantError("Entity not linked to config entry")
+        return hass.data[DOMAIN][entry_id]
+        
     async def handle_write_register(call: ServiceCall):
-    #    entity_id = call.data.get("entity_id")  # not used yet
         address = call.data["address"]
         value = call.data["value"]
         size = call.data.get("size", 1)
         
-        # Get coordinator from entity
-        # Assume single hub for simplicity; adjust if multi
-        coordinator = list(hass.data[DOMAIN].values())[0]  # Or use entity to find entry_id
-        success = await coordinator.async_write_registers(address, value, size)
+        hub = _get_hub()
+        success = await hub.async_write_registers(address, value, size)
         if success:
             _LOGGER.info("Wrote value %s to address %s", value, address)
-            await coordinator.async_request_refresh()
+            await hub.async_request_refresh()
         else:
-            _LOGGER.error("Failed to write to address %s", address)
-
+            raise HomeAssistantError(f"Failed to write to address {address}")
+    
+    async def handle_read_register(call: ServiceCall):
+        address = call.data["address"]
+        size = call.data.get("size", 1)
+    
+        hub = _get_hub()
+        value = await hub.async_read_registers(address, size)
+    
+        if value is None:
+            raise HomeAssistantError("Read failed")
+    
+        return {"value": value}
+        
     hass.services.async_register(DOMAIN, "write_register", handle_write_register)
+    hass.services.async_register(DOMAIN, "read_register", handle_read_register)
+
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
