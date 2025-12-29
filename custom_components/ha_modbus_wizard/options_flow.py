@@ -1,5 +1,5 @@
 from homeassistant import config_entries
-from homeassistant.core import callback
+#from homeassistant.core import callback
 from homeassistant.helpers import selector
 import voluptuous as vol
 from datetime import timedelta
@@ -97,8 +97,6 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         # In a real app, you might use a multi-select to delete registers here
         if user_input is not None:
             return await self.async_step_init()
-
-        register_names = [r.get("name", "Unknown") for r in self._registers]
         
         return self.async_show_form(
             step_id="list_registers",
