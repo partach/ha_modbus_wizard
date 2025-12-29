@@ -1,7 +1,6 @@
 """Data update coordinator for Modbus Wizard."""
 
 import logging
-from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 # from pymodbus.exceptions import ModbusException, ConnectionException
