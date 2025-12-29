@@ -51,7 +51,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             return False
 
     async def async_read_registers(self, address: int, size: int = 1):
-    """Read holding registers."""
+        """Read holding registers."""
         try:
             result = await self.client.read_holding_registers(
                 address=address,
@@ -68,9 +68,10 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     
             return result.registers
 
-    except Exception as err:
-        _LOGGER.error("Read error: %s", err)
-        return None
+        except Exception as err:
+            _LOGGER.error("Read error: %s", err)
+            return None
+            
     async def _async_update_data(self) -> dict:
         """Fetch data from registers in options."""
         if not await self._async_connect():
