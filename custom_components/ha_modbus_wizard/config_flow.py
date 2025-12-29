@@ -32,11 +32,12 @@ from .const import (
     DEFAULT_BYTESIZE,
     CONF_FIRST_REG,
     CONF_FIRST_REG_SIZE,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain="modbus_wizard"):
+class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle config flow."""
 
     VERSION = 1
