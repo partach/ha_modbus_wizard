@@ -32,7 +32,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     async def _async_connect(self) -> bool:
         if not self.connected:
             try:
-                await self.client.connect()
+                self.client.connect()
                 self.connected = self.client.connected
             except Exception as err:
                 _LOGGER.error("Failed to connect: %s", err)
