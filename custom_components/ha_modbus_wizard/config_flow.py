@@ -215,12 +215,12 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             for name, method in methods:
                 try:
                     if name in ("coils", "discrete inputs"):
-                        result = await method(address=address, count=count, slave=slave_id)
+                        result = await method(address=address, count=count, device_id=slave_id)
                         if not result.isError() and hasattr(result, "bits") and len(result.bits) >= count:
                             success = True
                             break
                     else:
-                        result = await method(address=address, count=count, slave=slave_id)
+                        result = await method(address=address, count=count, device_id=slave_id)
                         if not result.isError() and hasattr(result, "registers") and len(result.registers) == count:
                             success = True
                             break
