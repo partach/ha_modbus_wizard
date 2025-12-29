@@ -10,6 +10,7 @@ from homeassistant.helpers import selector
 from homeassistant.config_entries import ConfigEntry
 from .options_flow import ModbusWizardOptionsFlow
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
+from homeassistant.helpers import config_validation as cv
 from homeassistant.core import callback
 from .const import (
     CONNECTION_TYPE_SERIAL,
@@ -58,12 +59,27 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=vol.Schema({
                     vol.Required(CONF_CONNECTION_TYPE, default=CONNECTION_TYPE_SERIAL): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=[CONNECTION_TYPE_SERIAL, CONNECTION_TYPE_TCP])
+                        selector.SelectSelectorConfig(
+                            options=[
+                                selector.SelectOptionDict(value=CONNECTION_TYPE_SERIAL, label="Serial (RS485/RTU)"),
+                                selector.SelectOptionDict(value=CONNECTION_TYPE_TCP, label="TCP/IP (Modbus TCP)"),
+                            ],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
                     ),
-                    vol.Required(CONF_NAME, default="Modbus Hub"): vol.string,
-                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.positive_int,
-                    vol.Required(CONF_FIRST_REG, default=0): vol.positive_int,
-                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.positive_int,
+                    vol.Required(CONF_NAME, default="Modbus Hub"): str,  # cv.string → just str
+                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=1, max=247)
+                    ),
+                    vol.Required(CONF_FIRST_REG, default=0): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=0, max=65535)
+                    ),
+                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=1, max=20)  # or whatever max you want
+                    ),
                 }),
             )
         conn_type = user_input[CONF_CONNECTION_TYPE]
@@ -160,7 +176,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=self._user_input.get(CONF_NAME, "Modbus Hub")): str,
-                vol.Required(CONF_HOST): str,
+                vol.Required(CONF_HOST): cv.string,
                 vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=65535)
                 ),
