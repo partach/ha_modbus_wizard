@@ -39,6 +39,17 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 vol.Required("size", default=1): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=4)
                 ),
+                vol.Required("register_type", default="holding"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            "holding",    # read/write words
+                            "input",      # read-only words
+                            "coil",       # read/write bits
+                            "discrete",   # read-only bits
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN
+                    )
+                ),
                 vol.Required("data_type", default="uint"): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=["uint", "int", "float", "string"])
                 ),
