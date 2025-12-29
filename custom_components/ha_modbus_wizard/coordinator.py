@@ -17,18 +17,20 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         client, 
         slave_id: int, 
         config_entry,
+        update_interval=10,
     ):
         super().__init__(
             hass,
             _LOGGER,
             name="Modbus Wizard",
-            update_interval=timedelta(seconds=10),  # From options later
+            update_interval=timedelta(seconds=update_interval),  # From options later
         )
         self.client = client
         self.slave_id = slave_id
         self.config_entry = config_entry
         self.connected = False
         self.self._resolved_register_types = {}
+        self.update_interval = update_interval
 
     async def _async_connect(self) -> bool:
         if not self.connected:
