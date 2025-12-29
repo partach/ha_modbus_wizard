@@ -1,65 +1,110 @@
-"""Options flow for Modbus Wizard."""
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 import voluptuous as vol
+from datetime import timedelta
+
+from .const import (
+    CONF_UPDATE_INTERVAL, 
+    DOMAIN,
+    CONF_REGISTERS,
+)
 
 class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow."""
+    """Handle options flow for Modbus Wizard."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry: config_entries.ConfigEntry):
+        """Initialize options flow."""
         self.config_entry = config_entry
-        self.registers = self.config_entry.options.get("registers", [])
+        # Use a local copy of registers to modify during the session
+        self._registers = list(self.config_entry.options.get(CONF_REGISTERS, []))
 
     async def async_step_init(self, user_input=None):
-        """Manage options."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="init",
-                description_placeholders={"registers": str(len(self.registers))},
-                data_schema=vol.Schema({}),
-            )
+        """Main options menu."""
+        # This step acts as a menu to either change settings or go to register management
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=[
+                {"id": "settings", "title": "Settings"},
+                {"id": "add_register", "title": "Add Register"},
+                {"id": "list_registers", "title": f"Registers ({len(self._registers)})"}  # Dynamic count
+        ]
+        )
+
+    async def async_step_settings(self, user_input=None):
+        """Manage global settings like update interval."""
+        if user_input is not None:
+            # Update the coordinator immediately if it exists
+            if DOMAIN in self.hass.data and self.config_entry.entry_id in self.hass.data[DOMAIN]:
+                coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
+                new_interval = user_input.get(CONF_UPDATE_INTERVAL, 10)
+                coordinator.update_interval = timedelta(seconds=new_interval)
+
+            return self.async_create_entry(title="", data={
+                **self.config_entry.options,
+                **user_input,
+                CONF_REGISTERS: self._registers
+            })
+
+        current_interval = self.config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
         
-        # Redirect to add_register
-        return await self.async_step_add_register()
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=vol.Schema({
+                vol.Required(CONF_UPDATE_INTERVAL, default=current_interval): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=5, max=300)
+                ),
+            })
+        )
 
     async def async_step_add_register(self, user_input=None):
-        """Add a new register."""
+        """Add a new register definition."""
         if user_input is not None:
-            self.registers.append(user_input)
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, options={"registers": self.registers}
+            self._registers.append(user_input)
+            # Update the entry with the new list and return to init
+            return self.async_create_entry(
+                title="", 
+                data={**self.config_entry.options, CONF_REGISTERS: self._registers}
             )
-            return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
             step_id="add_register",
             data_schema=vol.Schema({
-                vol.Required("name"): vol.string,
-                vol.Required("address"): vol.positive_int,
+                vol.Required("name"): str,
+                vol.Required("address"): vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
                 vol.Required("size", default=1): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=4)
+                    selector.NumberSelectorConfig(min=1, max=20, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Required("register_type", default="holding"): selector.SelectSelector(
+                vol.Required("register_type", default="auto"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[
-                            "auto", # automatically try to get a match.
-                            "holding",    # read/write words
-                            "input",      # read-only words
-                            "coil",       # read/write bits
-                            "discrete",   # read-only bits
-                        ],
+                        options=["auto", "holding", "input", "coil", "discrete"],
                         mode=selector.SelectSelectorMode.DROPDOWN
                     )
                 ),
                 vol.Required("data_type", default="uint"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["uint", "int", "float", "string"])
+                    selector.SelectSelectorConfig(
+                        options=["uint", "int", "float", "string"],
+                        mode=selector.SelectSelectorMode.DROPDOWN
+                    )
                 ),
-                vol.Optional("device_class"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["voltage", "current", "power", "energy", "battery"])  # Add more
-                ),
-                vol.Required("rw", default="read"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["read", "write"])
-                ),
-                vol.Optional("unit"): vol.string,
-            }),
+                vol.Optional("unit"): str,
+            })
+        )
+
+    async def async_step_list_registers(self, user_input=None):
+        """Show current registers (simple implementation)."""
+        # In a real app, you might use a multi-select to delete registers here
+        if user_input is not None:
+            return await self.async_step_init()
+
+        register_names = [r.get("name", "Unknown") for r in self._registers]
+        
+        return self.async_show_form(
+            step_id="list_registers",
+            description_placeholders={
+                "count": str(len(self._registers)),
+                "names": "<br>".join([f"• {r['name']} (@{r['address']})" for r in self._registers]) or "None"
+            },
+            data_schema=vol.Schema({}), # Just an 'OK' button essentially
         )
