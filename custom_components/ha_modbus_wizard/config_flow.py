@@ -152,7 +152,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=user_input[CONF_NAME],
                     data=self._user_input,
-                    options=self._get_default_options(),
                 )
 
             except ConnectionError:
@@ -210,7 +209,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title=user_input[CONF_NAME],
                     data=self._user_input,
-                    options=self._get_default_options(),
                 )
 
             except ConnectionError:
@@ -251,7 +249,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ModbusException(f"Modbus read error: {result}")
                 
             if len(result.registers) != reg_size:
-                raise ValueError("Invalid response: expected %i register(s), got %i register(s)",reg_size,result.registers)    
+                raise ValueError(f"Invalid response: expected {reg_size} register(s), got {len(result.registers)} register(s)")
         finally:
             if client is not None:
                 try:
@@ -282,7 +280,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ModbusException(f"Modbus read error: {result}")
     
             if len(result.registers) != reg_size:
-                raise ValueError("Invalid response: expected %i register(s), got %i register(s)",reg_size,result.registers)    
+                raise ValueError(f"Invalid response: expected {reg_size} register(s), got {len(result.registers)} register(s)")
     
         finally:
             if client is not None:
