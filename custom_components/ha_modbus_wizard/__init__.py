@@ -125,7 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client=hub.client,
         slave_id=config[CONF_SLAVE_ID],
         config_entry=entry,
-        update_interval=timedelta(seconds=update_interval_seconds),
+        update_interval=timedelta(seconds=update_interval),
     )
     
     # Store config and hub_key
