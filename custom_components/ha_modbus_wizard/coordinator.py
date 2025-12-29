@@ -101,9 +101,9 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     for name, method in methods:
                         try:
                             if name in ("coil", "discrete"):
-                                result = await method(address=address, count=count, slave=self.slave_id)
+                                result = await method(address=address, count=count, device_id=self.slave_id)
                             else:
-                                result = await method(address=address, count=count, slave=self.slave_id)
+                                result = await method(address=address, count=count, device_id=self.slave_id)
     
                             if not result.isError():
                                 success_type = name
@@ -141,13 +141,13 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 # === DIRECT READ USING FINAL reg_type ===
                 if result is None:
                     if reg_type == "holding":
-                        result = await self.client.read_holding_registers(address, count, slave=self.slave_id)
+                        result = await self.client.read_holding_registers(address, count, device_id=self.slave_id)
                     elif reg_type == "input":
-                        result = await self.client.read_input_registers(address, count, slave=self.slave_id)
+                        result = await self.client.read_input_registers(address, count, device_id=self.slave_id)
                     elif reg_type == "coil":
-                        result = await self.client.read_coils(address, count, slave=self.slave_id)
+                        result = await self.client.read_coils(address, count, device_id=self.slave_id)
                     elif reg_type == "discrete":
-                        result = await self.client.read_discrete_inputs(address, count, slave=self.slave_id)
+                        result = await self.client.read_discrete_inputs(address, count, device_id=self.slave_id)
                     else:
                         _LOGGER.warning("Invalid register type '%s' for '%s'", reg_type, reg["name"])
                         continue
