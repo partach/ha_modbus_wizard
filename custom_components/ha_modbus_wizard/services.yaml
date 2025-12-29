@@ -33,3 +33,34 @@ write_register:
           min: 1
           max: 4
           step: 1
+
+read_register:
+  name: Read Register
+  description: Read one or more Modbus registers.
+  target:
+    entity:
+      integration: modbus_wizard
+  fields:
+    address:
+      name: Register Address
+      description: Modbus register address.
+      required: true
+      example: 100
+      selector:
+        number:
+          mode: box
+          min: 0
+          max: 65535
+          step: 1
+
+    size:
+      name: Register Count
+      description: Number of registers to read.
+      required: false
+      default: 1
+      selector:
+        number:
+          mode: box
+          min: 1
+          max: 4
+          step: 1
