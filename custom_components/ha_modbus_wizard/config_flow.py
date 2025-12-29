@@ -243,12 +243,11 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ModbusException(f"Modbus read error: {result}")
                 
             if len(result.registers) != reg_size:
-                raise ValueError("Invalid response: expected 1 register")
-    
+                raise ValueError("Invalid response: expected %i register(s), got %i register(s)",reg_size,result.registers)    
         finally:
             if client is not None:
                 try:
-                    await client.close()
+                    client.close()
                 except Exception as err:
                     _LOGGER.debug("Error closing Modbus Serial client: %s", err)
 
@@ -275,12 +274,11 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ModbusException(f"Modbus read error: {result}")
     
             if len(result.registers) != reg_size:
-                # Note: Testing 1 register here for consistency with serial test
-                raise ValueError("Invalid response: expected 1 register")
+                raise ValueError("Invalid response: expected %i register(s), got %i register(s)",reg_size,result.registers)    
     
         finally:
             if client is not None:
                 try:
-                    await client.close()
+                    client.close()
                 except Exception as err:
                     _LOGGER.debug("Error closing Modbus TCP client: %s", err)
