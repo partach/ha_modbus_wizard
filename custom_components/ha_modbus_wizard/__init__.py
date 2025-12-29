@@ -7,7 +7,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 from homeassistant.exceptions import HomeAssistantError
-
+from datetime import timedelta
 from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
@@ -125,7 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client=hub.client,
         slave_id=config[CONF_SLAVE_ID],
         config_entry=entry,
-        update_interval=update_interval,
+        update_interval=timedelta(seconds=update_interval_seconds),
     )
     
     # Store config and hub_key
