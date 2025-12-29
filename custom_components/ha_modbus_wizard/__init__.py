@@ -7,7 +7,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 from homeassistant.exceptions import HomeAssistantError
-from datetime import timedelta
 from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
@@ -98,7 +97,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Get or create shared hub
     hubs = hass.data.setdefault(DOMAIN, {}).setdefault("hubs", {})
-    update_interval = entry.options.get("update_interval", 10)
     if connection_type == CONNECTION_TYPE_SERIAL:
         port = config[CONF_SERIAL_PORT]
         baudrate = config.get(CONF_BAUDRATE, DEFAULT_BAUDRATE)
@@ -125,7 +123,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client=hub.client,
         slave_id=config[CONF_SLAVE_ID],
         config_entry=entry,
-        update_interval=timedelta(seconds=update_interval),
     )
     
     # Store config and hub_key
