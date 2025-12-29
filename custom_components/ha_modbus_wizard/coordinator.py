@@ -5,6 +5,7 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 # from pymodbus.exceptions import ModbusException, ConnectionException
+from .const import CONF_UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         self.slave_id = slave_id
         self.config_entry = config_entry
         self.connected = False
-        self.update_interval = config_entry.options.get("update_interval", 10)
+        self.update_interval = config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
 
 
     async def _async_connect(self) -> bool:
