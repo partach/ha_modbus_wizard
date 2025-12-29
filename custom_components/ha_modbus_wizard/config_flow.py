@@ -68,18 +68,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         )
                     ),
                     vol.Required(CONF_NAME, default="Modbus Hub"): str,  # cv.string → just str
-                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
-                        vol.Coerce(int),
-                        vol.Range(min=1, max=247)
-                    ),
-                    vol.Required(CONF_FIRST_REG, default=0): vol.All(
-                        vol.Coerce(int),
-                        vol.Range(min=0, max=65535)
-                    ),
-                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
-                        vol.Coerce(int),
-                        vol.Range(min=1, max=20)  # or whatever max you want
-                    ),
                 }),
             )
         conn_type = user_input[CONF_CONNECTION_TYPE]
@@ -131,6 +119,14 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_BYTESIZE, default=DEFAULT_BYTESIZE): vol.In(
                     [7, 8]
                 ),
+                vol.Required(CONF_FIRST_REG, default=0): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=0, max=65535)
+                ),
+                vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=1, max=20)  # or whatever max you want
+                ),
             }
         )
 
@@ -147,6 +143,8 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_PARITY: user_input[CONF_PARITY],
                     CONF_STOPBITS: user_input[CONF_STOPBITS],
                     CONF_BYTESIZE: user_input[CONF_BYTESIZE],
+                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
+                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
                 self._user_input.update(final_data)
                 await self._async_test_serial_connection(self._user_input)
@@ -183,6 +181,14 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=247)
                 ),
+                vol.Required(CONF_FIRST_REG, default=0): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=0, max=65535)
+                ),
+                vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=1, max=20)  # or whatever max you want
+                ),
             }
         )
 
@@ -194,6 +200,8 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
                     CONF_SLAVE_ID: user_input[CONF_SLAVE_ID],
+                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
+                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
                 self._user_input.update(final_data)                
 
