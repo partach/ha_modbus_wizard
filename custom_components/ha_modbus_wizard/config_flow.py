@@ -1,17 +1,19 @@
 """Config flow for Modbus Wizard."""
 import logging
 from typing import Any
+
 import serial.tools.list_ports
 import voluptuous as vol
-from pymodbus.exceptions import ModbusException
-from homeassistant.data_entry_flow import FlowResult
+
 from homeassistant import config_entries
 from homeassistant.helpers import selector
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant.config_entries import ConfigEntry
-from .options_flow import ModbusWizardOptionsFlow
-from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
-from homeassistant.helpers import config_validation as cv
 from homeassistant.core import callback
+
+from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
+from pymodbus.exceptions import ModbusException
+
 from .const import (
     CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_TCP,
@@ -25,39 +27,48 @@ from .const import (
     CONF_NAME,
     CONF_STOPBITS,
     CONF_BYTESIZE,
+    CONF_FIRST_REG,
+    CONF_FIRST_REG_SIZE,
     DEFAULT_SLAVE_ID,
     DEFAULT_BAUDRATE,
     DEFAULT_TCP_PORT,
     DEFAULT_PARITY,
     DEFAULT_STOPBITS,
     DEFAULT_BYTESIZE,
-    CONF_FIRST_REG,
-    CONF_FIRST_REG_SIZE,
     DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle config flow."""
+    """Handle config flow for Modbus Wizard."""
 
     VERSION = 1
-    def __init__(self):
+
+    def __init__(self) -> None:
         """Initialize the config flow."""
-        self._connection_type = None
-        self._user_input = {}
-    
+        self._data: dict[str, Any] = {}
+
     @classmethod
     @callback
-    def async_get_options_flow(cls, config_entry: ConfigEntry):
+    def async_get_options_flow(config_entry: ConfigEntry):
+        """Get the options flow for this handler."""
+        from .options_flow import ModbusWizardOptionsFlow
         return ModbusWizardOptionsFlow(config_entry)
-       
-    async def async_step_user(self, user_input=None):
-        """Handle initial step."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=vol.Schema({
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """First step: common settings and first register for test."""
+        if user_input is not None:
+            self._data.update(user_input)
+            if user_input[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_SERIAL:
+                return await self.async_step_serial()
+            return await self.async_step_tcp()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME, default="Modbus Hub"): str,
                     vol.Required(CONF_CONNECTION_TYPE, default=CONNECTION_TYPE_SERIAL): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=[
@@ -67,280 +78,164 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
-                    vol.Required(CONF_NAME, default="Modbus Hub"): str,  # cv.string → just str
-                }),
-            )
-        conn_type = user_input[CONF_CONNECTION_TYPE]
-        self._user_input=user_input.copy()
-        if conn_type == CONNECTION_TYPE_SERIAL:
-            return await self.async_step_serial(user_input)
-        else:
-            return await self.async_step_tcp(user_input)
+                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=247)
+                    ),
+                    vol.Required(CONF_FIRST_REG, default=0): vol.All(
+                        vol.Coerce(int), vol.Range(min=0, max=65535)
+                    ),
+                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=20)
+                    ),
+                }
+            ),
+        )
 
     async def async_step_serial(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handle serial connection configuration."""
+        """Serial-specific settings."""
         errors = {}
 
-        # Discover serial ports
         ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
         port_options = [
             selector.SelectOptionDict(
                 value=port.device,
-                label=(
-                    f"{port.device} - {port.description or 'Unknown device'}"
-                    + (f" ({port.manufacturer})" if port.manufacturer else "")
-                ),
+                label=f"{port.device} - {port.description or 'Unknown'}"
+                      + (f" ({port.manufacturer})" if port.manufacturer else ""),
             )
-            for port in ports if port.device
+            for port in ports
         ]
-        port_options.sort(key=lambda x: x["value"])
-
-        data_schema = vol.Schema(
-            {
-                vol.Required(CONF_NAME, default=self._user_input.get(CONF_NAME, "Modbus Hub")): str,
-                vol.Required(CONF_SERIAL_PORT): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=port_options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=247)
-                ),
-                vol.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): vol.In(
-                    [2400, 4800, 9600, 19200, 38400]
-                ),
-                vol.Required(CONF_PARITY, default=DEFAULT_PARITY): vol.In(
-                    ["N", "E", "O"]
-                ),
-                vol.Required(CONF_STOPBITS, default=DEFAULT_STOPBITS): vol.In(
-                    [1, 2]
-                ),
-                vol.Required(CONF_BYTESIZE, default=DEFAULT_BYTESIZE): vol.In(
-                    [7, 8]
-                ),
-                vol.Required(CONF_FIRST_REG, default=0): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=0, max=65535)
-                ),
-                vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=1, max=20)  # or whatever max you want
-                ),
-            }
-        )
+        port_options.sort(key=lambda opt: opt["value"])
 
         if user_input is not None:
             try:
-                # Merge data from previous step if we stored it, or just rely on defaults/hidden fields if simpler.
-                # Here we reconstruct the full config.
                 final_data = {
-                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_SERIAL,
-                    CONF_NAME: user_input[CONF_NAME],
+                    **self._data,
                     CONF_SERIAL_PORT: user_input[CONF_SERIAL_PORT],
-                    CONF_SLAVE_ID: user_input[CONF_SLAVE_ID],
                     CONF_BAUDRATE: user_input[CONF_BAUDRATE],
                     CONF_PARITY: user_input[CONF_PARITY],
                     CONF_STOPBITS: user_input[CONF_STOPBITS],
                     CONF_BYTESIZE: user_input[CONF_BYTESIZE],
-                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
-                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
-                self._user_input.update(final_data)
-                await self._async_test_serial_connection(self._user_input)
 
-                return self.async_create_entry(
-                    title=user_input[CONF_NAME],
-                    data=self._user_input,
-                )
+                await self._async_test_connection(final_data)
 
-            except ConnectionError:
-                errors["base"] = "cannot_connect"
-            except ModbusException:
-                errors["base"] = "read_error"
-            except ValueError:
-                errors["base"] = "read_error"
+                return self.async_create_entry(title=final_data[CONF_NAME], data=final_data)
+
             except Exception as err:
-                errors["base"] = "unknown"
-                _LOGGER.exception("Unexpected error during modbus serial setup: %s", err)
+                _LOGGER.exception("Serial connection test failed: %s", err)
+                errors["base"] = "cannot_connect"
 
-        return self.async_show_form(step_id="serial", data_schema=data_schema, errors=errors)
+        return self.async_show_form(
+            step_id="serial",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME, default=self._data.get(CONF_NAME, "Modbus Hub")): str,
+                    vol.Required(CONF_SERIAL_PORT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=port_options, mode=selector.SelectSelectorMode.DROPDOWN)
+                    ),
+                    vol.Required(CONF_BAUDRATE, default=DEFAULT_BAUDRATE): vol.In([2400, 4800, 9600, 19200, 38400]),
+                    vol.Required(CONF_PARITY, default=DEFAULT_PARITY): vol.In(["N", "E", "O"]),
+                    vol.Required(CONF_STOPBITS, default=DEFAULT_STOPBITS): vol.In([1, 2]),
+                    vol.Required(CONF_BYTESIZE, default=DEFAULT_BYTESIZE): vol.In([7, 8]),
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_tcp(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Handle TCP connection configuration."""
+        """TCP-specific settings."""
         errors = {}
-
-        data_schema = vol.Schema(
-            {
-                vol.Required(CONF_NAME, default=self._user_input.get(CONF_NAME, "Modbus Hub")): str,
-                vol.Required(CONF_HOST): cv.string,
-                vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=65535)
-                ),
-                vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=247)
-                ),
-                vol.Required(CONF_FIRST_REG, default=0): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=0, max=65535)
-                ),
-                vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
-                    vol.Coerce(int),
-                    vol.Range(min=1, max=20)  # or whatever max you want
-                ),
-            }
-        )
 
         if user_input is not None:
             try:
                 final_data = {
-                    CONF_CONNECTION_TYPE: CONNECTION_TYPE_TCP,
-                    CONF_NAME: user_input[CONF_NAME],
+                    **self._data,
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
-                    CONF_SLAVE_ID: user_input[CONF_SLAVE_ID],
-                    CONF_FIRST_REG: user_input[CONF_FIRST_REG],
-                    CONF_FIRST_REG_SIZE: user_input[CONF_FIRST_REG_SIZE],
                 }
-                self._user_input.update(final_data)                
 
-                await self._async_test_tcp_connection(self._user_input)
+                await self._async_test_connection(final_data)
 
-                return self.async_create_entry(
-                    title=user_input[CONF_NAME],
-                    data=self._user_input,
-                )
+                return self.async_create_entry(title=final_data[CONF_NAME], data=final_data)
 
-            except ConnectionError:
-                errors["base"] = "cannot_connect"
-            except ModbusException:
-                errors["base"] = "read_error"
-            except ValueError:
-                errors["base"] = "read_error"
             except Exception as err:
-                errors["base"] = "unknown"
-                _LOGGER.exception("Unexpected error during modbus TCP setup: %s", err)
+                _LOGGER.exception("TCP connection test failed: %s", err)
+                errors["base"] = "cannot_connect"
 
-        return self.async_show_form(step_id="tcp", data_schema=data_schema, errors=errors)
+        return self.async_show_form(
+            step_id="tcp",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME, default=self._data.get(CONF_NAME, "Modbus Hub")): str,
+                    vol.Required(CONF_HOST): str,
+                    vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=65535)
+                    ),
+                }
+            ),
+            errors=errors,
+        )
 
-    async def _async_test_serial_connection(self, data: dict[str, Any]) -> None:
-        """Test serial connection and try reading the first register with all possible types."""
+    async def _async_test_connection(self, data: dict[str, Any]) -> None:
+        """Test connection and try reading the first register with all register types."""
         client = None
         try:
-            client = AsyncModbusSerialClient(
-                port=data[CONF_SERIAL_PORT],
-                baudrate=data[CONF_BAUDRATE],
-                parity=data.get(CONF_PARITY, DEFAULT_PARITY),
-                stopbits=data.get(CONF_STOPBITS, DEFAULT_STOPBITS),
-                bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
-                timeout=5,
-            )
-    
+            if data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_SERIAL:
+                client = AsyncModbusSerialClient(
+                    port=data[CONF_SERIAL_PORT],
+                    baudrate=data[CONF_BAUDRATE],
+                    parity=data.get(CONF_PARITY, DEFAULT_PARITY),
+                    stopbits=data.get(CONF_STOPBITS, DEFAULT_STOPBITS),
+                    bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
+                    timeout=5,
+                )
+            else:
+                client = AsyncModbusTcpClient(
+                    host=data[CONF_HOST],
+                    port=data[CONF_PORT],
+                    timeout=5,
+                )
+
             await client.connect()
             if not client.connected:
-                raise ConnectionError("Failed to open serial port")
-    
-            address = self._user_input[CONF_FIRST_REG]
-            count = self._user_input[CONF_FIRST_REG_SIZE]
+                raise ConnectionError("Failed to connect to Modbus device")
+
+            address = data[CONF_FIRST_REG]
+            count = data[CONF_FIRST_REG_SIZE]
             slave_id = data[CONF_SLAVE_ID]
-    
-            # Try in order of most common → least common
-            read_methods = [
+
+            methods = [
                 ("holding registers", client.read_holding_registers),
                 ("input registers", client.read_input_registers),
                 ("coils", client.read_coils),
                 ("discrete inputs", client.read_discrete_inputs),
             ]
-    
-            success = False
-            for name, method in read_methods:
-                try:
-                    if name in ("coils", "discrete inputs"):
-                        # For bits, count is number of bits
-                        result = await method(address=address, count=count, slave=slave_id)
-                        if not result.isError() and hasattr(result, "bits"):
-                            if len(result.bits) >= count:  # At least the requested bits
-                                success = True
-                                break
-                    else:
-                        # For registers (words)
-                        result = await method(address=address, count=count, slave=slave_id)
-                        if not result.isError() and hasattr(result, "registers"):
-                            if len(result.registers) == count:
-                                success = True
-                                break
-                except Exception as inner_err:
-                    _LOGGER.debug("Test read failed for %s at addr %d: %s", name, address, inner_err)
-                    continue  # Try next type
-    
-            if not success:
-                raise ValueError(
-                    f"Could not read {count} value(s) from address {address} using any register type "
-                    "(tried holding, input, coils, discrete). Check address, size, or slave ID."
-                )
-    
-        finally:
-            if client:
-                try:
-                    client.close()
-                except Exception as err:
-                    _LOGGER.debug("Error closing Modbus Serial client: %s", err)
 
-    async def _async_test_tcp_connection(self, data: dict[str, Any]) -> None:
-        """Test TCP connection to the modbus device."""
-        client = None
-        try:
-            client = AsyncModbusTcpClient(
-                host=data[CONF_HOST],
-                port=data[CONF_PORT],
-                timeout=3,
-            )
-            await client.connect()
-            if not client.connected:
-                raise ConnectionError("Failed to open serial port")
-    
-            address = self._user_input[CONF_FIRST_REG]
-            count = self._user_input[CONF_FIRST_REG_SIZE]
-            slave_id = data[CONF_SLAVE_ID]
-    
-            # Try in order of most common → least common
-            read_methods = [
-                ("holding registers", client.read_holding_registers),
-                ("input registers", client.read_input_registers),
-                ("coils", client.read_coils),
-                ("discrete inputs", client.read_discrete_inputs),
-            ]
-    
             success = False
-            for name, method in read_methods:
+            for name, method in methods:
                 try:
                     if name in ("coils", "discrete inputs"):
-                        # For bits, count is number of bits
                         result = await method(address=address, count=count, slave=slave_id)
-                        if not result.isError() and hasattr(result, "bits"):
-                            if len(result.bits) >= count:  # At least the requested bits
-                                success = True
-                                break
+                        if not result.isError() and hasattr(result, "bits") and len(result.bits) >= count:
+                            success = True
+                            break
                     else:
-                        # For registers (words)
                         result = await method(address=address, count=count, slave=slave_id)
-                        if not result.isError() and hasattr(result, "registers"):
-                            if len(result.registers) == count:
-                                success = True
-                                break
+                        if not result.isError() and hasattr(result, "registers") and len(result.registers) == count:
+                            success = True
+                            break
                 except Exception as inner_err:
                     _LOGGER.debug("Test read failed for %s at addr %d: %s", name, address, inner_err)
-                    continue  # Try next type
-    
+
             if not success:
-                raise ValueError(
-                    f"Could not read {count} value(s) from address {address} using any register type "
-                    "(tried holding, input, coils, discrete). Check address, size, or slave ID."
+                raise ModbusException(
+                    f"Could not read {count} value(s) from address {address} using any register type. "
+                    "Check address, size, slave ID, or device compatibility."
                 )
-    
+
         finally:
             if client:
                 try:
                     client.close()
                 except Exception as err:
-                    _LOGGER.debug("Error closing Modbus Serial client: %s", err)
+                    _LOGGER.debug("Error closing Modbus client: %s", err)
