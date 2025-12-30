@@ -201,17 +201,18 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         return coordinator
         
     async def handle_write_register(call: ServiceCall):
-        address = int(call.data["address"])
-        value = call.data["value"]
-        size = int(call.data.get("size", 1))
-        
         coordinator = _get_coordinator(call)
-        success = await coordinator.async_write_registers(address, value, size)
-        if success:
-            _LOGGER.info("Wrote value %s to address %s", value, address)
-            await coordinator.async_request_refresh()
-        else:
-            raise HomeAssistantError(f"Failed to write to address {address}")
+    
+        success = await coordinator.async_write_registers(
+            address=int(call.data["address"]),
+            value=call.data["value"],
+            data_type=call.data.get("data_type", "uint16"),
+            byte_order=call.data.get("byte_order", "big"),
+            word_order=call.data.get("word_order", "big"),
+        )
+    
+        if not success:
+            raise HomeAssistantError("Write failed")
     
     async def handle_read_register(call: ServiceCall):
         address = int(call.data["address"])
