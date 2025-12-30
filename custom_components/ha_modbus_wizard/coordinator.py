@@ -5,10 +5,6 @@ from __future__ import annotations
 import logging
 import asyncio
 from datetime import timedelta
-from pymodbus.factory import (
-    BinaryPayloadDecoder,
-    BinaryPayloadBuilder,
-)
 from pymodbus.constants import Endian
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -117,35 +113,46 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         byte_order: str = "big",
         word_order: str = "big",
     ):
-        type_map = {
-            "uint16": (1, "decode_16bit_uint"),
-            "int16": (1, "decode_16bit_int"),
-            "uint32": (2, "decode_32bit_uint"),
-            "int32": (2, "decode_32bit_int"),
-            "float32": (2, "decode_32bit_float"),
-        }
-    
-        if data_type not in type_map:
-            raise ValueError(f"Unsupported data_type: {data_type}")
-    
-        count, decode_fn = type_map[data_type]
-    
-        result = await self.client.read_holding_registers(
-            address=address,
-            count=count,
-            device_id=self.slave_id,
-        )
-    
-        if result.isError():
+        """Read and decode registers in one step using the new mixin logic."""
+        if not await self._async_connect():
             return None
-    
-        decoder = BinaryPayloadDecoder.fromRegisters(
-            result.registers,
-            byteorder=Endian.Big if byte_order == "big" else Endian.Little,
-            wordorder=Endian.Big if word_order == "big" else Endian.Little,
-        )
-    
-        return getattr(decoder, decode_fn)()               
+
+        # Map string keys to register counts
+        # (The actual decoding is handled by the unified _decode_value helper)
+        type_counts = {
+            "uint16": 1,
+            "int16": 1,
+            "uint32": 2,
+            "int32": 2,
+            "float32": 2,
+        }
+
+        if data_type not in type_counts:
+            raise ValueError(f"Unsupported data_type: {data_type}")
+
+        count = type_counts[data_type]
+
+        async with self._lock:
+            try:
+                result = await self.client.read_holding_registers(
+                    address=address,
+                    count=count,
+                    slave=self.slave_id,
+                )
+
+                if result.isError():
+                    return None
+
+                return self._decode_value(
+                    result.registers,
+                    data_type,
+                    byte_order,
+                    word_order,
+                )
+
+            except Exception as err:
+                _LOGGER.error("Typed read error at %s: %s", address, err)
+                return None           
 
     # ------------------------------------------------------------------
     # Polling
@@ -246,49 +253,50 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # De/encoding
     # ------------------------------------------------------------------
     def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
-        if data_type == "uint":
-            return registers[0] if len(registers) == 1 else sum(r << (16 * i) for i, r in enumerate(registers))
-        if data_type == "int" and len(registers) == 1:
-            val = registers[0]
-            return val if val < 32768 else val - 65536
+        """Decode registers using client mixin."""
+        # Simple bit-based types (Coils/Discrete) don't need decoding
+        if not isinstance(registers, list) or len(registers) == 0:
+            return registers
+
+        # Determine Pymodbus DATATYPE Enum
+        dt_map = {
+            "uint16": self.client.DATATYPE.UINT16,
+            "int16": self.client.DATATYPE.INT16,
+            "uint32": self.client.DATATYPE.UINT32,
+            "int32": self.client.DATATYPE.INT32,
+            "float32": self.client.DATATYPE.FLOAT32,
+            "uint": self.client.DATATYPE.UINT16 if len(registers) == 1 else self.client.DATATYPE.UINT32,
+            "int": self.client.DATATYPE.INT16 if len(registers) == 1 else self.client.DATATYPE.INT32,
+        }
         
-        # Multi-register types use decoder
-        decoder = BinaryPayloadDecoder.fromRegisters(
+        target_type = dt_map.get(data_type, self.client.DATATYPE.UINT16)
+        
+        decoded = self.client.convert_from_registers(
             registers,
-            byteorder=Endian.BIG if byte_order == "big" else Endian.LITTLE,
-            wordorder=Endian.BIG if word_order == "big" else Endian.LITTLE,
+            data_type=target_type,
+            byte_order=Endian.BIG if byte_order == "big" else Endian.LITTLE,
+            word_order=Endian.BIG if word_order == "big" else Endian.LITTLE,
         )
-        
-        if data_type in ("int16", "int"):
-            return decoder.decode_16bit_int()
-        if data_type in ("uint16", "uint"):
-            return decoder.decode_16bit_uint()
-        if data_type == "int32":
-            return decoder.decode_32bit_int()
-        if data_type == "uint32":
-            return decoder.decode_32bit_uint()
+
         if data_type == "float32":
-            return round(decoder.decode_32bit_float(), 6)
-    
-        raise ValueError(f"Unsupported data_type: {data_type}")
-        
+            return round(decoded, 6)
+        return decoded
+
     def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
-        builder = BinaryPayloadBuilder(
-            byteorder=Endian.BIG if byte_order == "big" else Endian.LITTLE,
-            wordorder=Endian.BIG if word_order == "big" else Endian.LITTLE,
+        """Encode value to registers using client mixin."""
+        dt_map = {
+            "uint16": self.client.DATATYPE.UINT16,
+            "int16": self.client.DATATYPE.INT16,
+            "uint32": self.client.DATATYPE.UINT32,
+            "int32": self.client.DATATYPE.INT32,
+            "float32": self.client.DATATYPE.FLOAT32,
+        }
+
+        target_type = dt_map.get(data_type, self.client.DATATYPE.UINT16)
+
+        return self.client.convert_to_registers(
+            value,
+            data_type=target_type,
+            byte_order=Endian.BIG if byte_order == "big" else Endian.LITTLE,
+            word_order=Endian.BIG if word_order == "big" else Endian.LITTLE,
         )
-    
-        if data_type == "int16":
-            builder.add_16bit_int(int(value))
-        elif data_type == "uint16":
-            builder.add_16bit_uint(int(value))
-        elif data_type == "int32":
-            builder.add_32bit_int(int(value))
-        elif data_type == "uint32":
-            builder.add_32bit_uint(int(value))
-        elif data_type == "float32":
-            builder.add_32bit_float(float(value))
-        else:
-            raise ValueError(f"Unsupported data_type: {data_type}")
-    
-        return builder.to_registers()
