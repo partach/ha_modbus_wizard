@@ -12,7 +12,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32")
     ]
     
-    async_add_entities(entities)
+    async_add_entities(entities, True)
 
 class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
     def __init__(self, coordinator, entry, key, info):
@@ -37,3 +37,8 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
             data_type=self._info.get("data_type", "uint16"),
         )
         await self.coordinator.async_request_refresh()
+            
+    @property
+    def available(self):
+        return self.coordinator.last_update_success
+
