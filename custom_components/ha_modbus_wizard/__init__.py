@@ -2,6 +2,7 @@
 import os
 import shutil
 import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -163,7 +164,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Services (register once)
     # ----------------------------------------------------------------
     if not hass.data[DOMAIN].get("services_registered"):
-        async_setup_services(hass)
+        await async_setup_services(hass)
         hass.data[DOMAIN]["services_registered"] = True
 
     # ----------------------------------------------------------------
@@ -177,7 +178,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_services(hass: HomeAssistant) -> None:
 
     def _get_coordinator(call: ServiceCall) -> ModbusWizardCoordinator:
-        entity_id = next(iter(call.data.get("entity_id", [])), None)
+        entity_id = call.data.get("entity_id")
+        if isinstance(entity_id, list):
+            entity_id = entity_id[0]
+        if not entity_id:
+            raise HomeAssistantError("entity_id is required")
         if not entity_id:
             raise HomeAssistantError("entity_id required")
 
@@ -197,7 +202,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         
     async def handle_write_register(call: ServiceCall):
         address = int(call.data["address"])
-        value = int(call.data["value"])
+        value = call.data["value"]
         size = int(call.data.get("size", 1))
         
         coordinator = _get_coordinator(call)
