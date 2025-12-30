@@ -17,7 +17,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         client, 
         slave_id: int, 
         config_entry,
-        update_interval: timedelta
+        update_interval: timedelta = timedelta(seconds=10),
     ):
         super().__init__(
             hass,
