@@ -24,27 +24,13 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         # This step acts as a menu to either change settings or go to register management
         return self.async_show_menu(
             step_id="init",
-            menu_options=[
-                {
-                    "id": "settings",
-                    "title": "Settings",
-                    "description": "Update interval and global options",
-                    "icon": "mdi:cog"
-                },
-                {
-                    "id": "add_register",
-                    "title": "Add Register",
-                    "description": "Define a new Modbus register",
-                    "icon": "mdi:plus-circle"
-                },
-                {
-                    "id": "list_registers",
-                    "title": f"Registers ({len(self._registers)})",
-                    "description": "View and manage configured registers",
-                    "icon": "mdi:list-box"
-                },
-            ]
+            menu_options={
+                "settings": "Settings",
+                "add_register": "Add Register",
+                "list_registers": f"Registers ({len(self._registers)})",
+            },
         )
+
 
     async def async_step_settings(self, user_input=None):
         """Manage global settings like update interval."""
