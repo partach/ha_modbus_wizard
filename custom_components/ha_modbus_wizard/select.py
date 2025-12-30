@@ -29,19 +29,25 @@ async def async_setup_entry(
         manufacturer="Partach",
         model="Wizard",
     )
-    entities = []
+    def update_entities():
+        entities = []
+        registers = entry.options.get("registers", [])
+        for reg in registers:
+            key = reg["name"].lower().replace(" ", "_")
+            if reg.get("rw", "read") != "read" and reg.get("options"):
+                entities.append(ModbusWizardSelect(coordinator, entry, key, reg, device_info))
+        if entities:
+            async_add_entities(entities, update=True)  # Replace existing with same unique_id
 
-    # Create select entities for writable registers with predefined options
-    for reg in entry.options.get("registers", []):
-        key = reg["name"].lower().replace(" ", "_")
-        
-        # Only create select entity if:
-        # 1. Register is writable
-        # 2. Has predefined options
-        if reg.get("rw") != "read" and reg.get("options"):
-            entities.append(ModbusWizardSelect(coordinator, entry, key, reg, device_info))
-    if entities:
-      async_add_entities(entities, update=True)
+    # Initial setup
+    update_entities()
+
+    # Listen for options changes to dynamically update entities
+    entry.async_on_unload(
+        entry.add_listener(update_entities)
+    )
+
+
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
