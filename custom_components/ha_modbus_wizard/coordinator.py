@@ -18,17 +18,19 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         client, 
         slave_id: int, 
         config_entry,
+        update_interval: timedelta
     ):
         super().__init__(
             hass,
             _LOGGER,
             name="Modbus Wizard",
+            update_interval=update_interval,
         )
         self.client = client
         self.slave_id = slave_id
         self.config_entry = config_entry
         self.connected = False
-        self.update_interval = config_entry.options.get(CONF_UPDATE_INTERVAL, timedelta(seconds=10))
+        self.update_interval = update_interval
 
 
     async def _async_connect(self) -> bool:
