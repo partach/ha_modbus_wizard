@@ -52,7 +52,9 @@ async def async_setup_entry(
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
     """Representation of a Modbus select entity with predefined options."""
-
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    
     def __init__(
         self,
         coordinator,
