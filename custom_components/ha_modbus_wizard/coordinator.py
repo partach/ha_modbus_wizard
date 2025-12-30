@@ -103,7 +103,43 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             except Exception as err:
                 _LOGGER.error("Read error at %s: %s", address, err)
                 return None
-                
+
+    async def async_read_typed(
+        self,
+        address: int,
+        data_type: str,
+        byte_order: str = "big",
+        word_order: str = "big",
+    ):
+        type_map = {
+            "uint16": (1, "decode_16bit_uint"),
+            "int16": (1, "decode_16bit_int"),
+            "uint32": (2, "decode_32bit_uint"),
+            "int32": (2, "decode_32bit_int"),
+            "float32": (2, "decode_32bit_float"),
+        }
+    
+        if data_type not in type_map:
+            raise ValueError(f"Unsupported data_type: {data_type}")
+    
+        count, decode_fn = type_map[data_type]
+    
+        result = await self.client.read_holding_registers(
+            address=address,
+            count=count,
+            device_id=self.slave_id,
+        )
+    
+        if result.isError():
+            return None
+    
+        decoder = BinaryPayloadDecoder.fromRegisters(
+            result.registers,
+            byteorder=Endian.Big if byte_order == "big" else Endian.Little,
+            wordorder=Endian.Big if word_order == "big" else Endian.Little,
+        )
+    
+        return getattr(decoder, decode_fn)()               
 
     # ------------------------------------------------------------------
     # Polling
