@@ -106,8 +106,9 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             step_id="add_register",
             data_schema=vol.Schema({
                 vol.Required("name"): str,
-                vol.Required("address"): vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
-
+                vol.Required("address"): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=65535, step=1, mode=selector.NumberSelectorMode.BOX)
+                ),
                 vol.Required("data_type", default="uint16"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=["uint16", "int16", "uint32", "int32", "float32", "uint64", "int64"],
