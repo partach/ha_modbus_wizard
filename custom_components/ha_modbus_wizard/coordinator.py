@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -346,4 +347,13 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             "int32": dt.INT32,
             "float32": dt.FLOAT32,
         }
+
+        target_type = dt_map.get(data_type, dt.UINT16)
+
+        return self.client.convert_to_registers(
+            value,
+            data_type=target_type,
+            byte_order=byte_order.lower(),
+            word_order=word_order.lower(),
+        )
 
