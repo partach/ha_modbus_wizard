@@ -25,10 +25,25 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options=[
-                {"id": "settings", "title": "Settings"},
-                {"id": "add_register", "title": "Add Register"},
-                {"id": "list_registers", "title": f"Registers ({len(self._registers)})"}  # Dynamic count
-        ]
+                {
+                    "id": "settings",
+                    "title": "Settings",
+                    "description": "Update interval and global options",
+                    "icon": "mdi:cog"
+                },
+                {
+                    "id": "add_register",
+                    "title": "Add Register",
+                    "description": "Define a new Modbus register",
+                    "icon": "mdi:plus-circle"
+                },
+                {
+                    "id": "list_registers",
+                    "title": f"Registers ({len(self._registers)})",
+                    "description": "View and manage configured registers",
+                    "icon": "mdi:list-box"
+                },
+            ]
         )
 
     async def async_step_settings(self, user_input=None):
@@ -99,17 +114,34 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             })
         )
 
-    async def async_step_list_registers(self, user_input=None):
-        """Show current registers (simple implementation)."""
-        # In a real app, you might use a multi-select to delete registers here
+        async def async_step_list_registers(self, user_input=None):
+        """View and delete registers."""
         if user_input is not None:
+            # If user selected registers to delete
+            to_delete = user_input.get("delete_registers", [])
+            if to_delete:
+                self._registers = [
+                    r for r in self._registers 
+                    if f"{r['name']} (@{r['address']})" not in to_delete
+                ]
+                return self.async_create_entry(
+                    title="", 
+                    data={**self.config_entry.options, CONF_REGISTERS: self._registers}
+                )
             return await self.async_step_init()
+        
+        # Create list of display strings for the selector
+        register_list = [f"{r['name']} (@{r['address']})" for r in self._registers]
         
         return self.async_show_form(
             step_id="list_registers",
-            description_placeholders={
-                "count": str(len(self._registers)),
-                "names": "<br>".join([f"• {r['name']} (@{r['address']})" for r in self._registers]) or "None"
-            },
-            data_schema=vol.Schema({}), # Just an 'OK' button essentially
+            data_schema=vol.Schema({
+                vol.Optional("delete_registers"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=register_list,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST
+                    )
+                ),
+            })
         )
