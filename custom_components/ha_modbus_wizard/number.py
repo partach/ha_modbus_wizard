@@ -6,6 +6,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.config_entries import ConfigEntry
 from typing import Any
 import logging
+from .const import CONF_REGISTERS 
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # Initial entity creation
     def update_entities():
         entities = []
-        registers = entry.options.get("registers", [])
+        registers = entry.options.get(CONF_REGISTERS, [])
         for reg in registers:
             key = reg["name"].lower().replace(" ", "_")
             if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32"):
