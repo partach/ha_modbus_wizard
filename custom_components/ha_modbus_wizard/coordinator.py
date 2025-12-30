@@ -137,7 +137,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 result = await self.client.read_holding_registers(
                     address=address,
                     count=count,
-                    slave=self.slave_id,
+                    device_id=self.slave_id,
                 )
 
                 if result.isError():
@@ -206,13 +206,13 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     # -------- DIRECT READ --------
                     if result is None:
                         if reg_type == "holding":
-                            result = await self.client.read_holding_registers(address, count, self.slave_id)
+                            result = await self.client.read_holding_registers(address, count, device_id=self.slave_id)
                         elif reg_type == "input":
-                            result = await self.client.read_input_registers(address, count, self.slave_id)
+                            result = await self.client.read_input_registers(address, count, device_id=self.slave_id)
                         elif reg_type == "coil":
-                            result = await self.client.read_coils(address, count, self.slave_id)
+                            result = await self.client.read_coils(address, count, device_id=self.slave_id)
                         elif reg_type == "discrete":
-                            result = await self.client.read_discrete_inputs(address, count, self.slave_id)
+                            result = await self.client.read_discrete_inputs(address, count, device_id=self.slave_id)
                         else:
                             continue
 
