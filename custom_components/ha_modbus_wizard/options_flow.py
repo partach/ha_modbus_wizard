@@ -15,7 +15,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
         """Initialize options flow."""
-        self._config_entry = config_entry
+        # self.config_entry = config_entry # should be handled by HA self
         # Use a local copy of registers to modify during the session
         self._registers = list(config_entry.options.get(CONF_REGISTERS, []))
 
@@ -35,18 +35,18 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         """Manage global settings like update interval."""
         if user_input is not None:
             # Update the coordinator immediately if it exists
-            if DOMAIN in self.hass.data and self._config_entry.entry_id in self.hass.data[DOMAIN]:
-                coordinator = self.hass.data[DOMAIN][self._config_entry.entry_id]
+            if DOMAIN in self.hass.data and self.config_entry.entry_id in self.hass.data[DOMAIN]:
+                coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
                 new_interval = user_input.get(CONF_UPDATE_INTERVAL, 10)
                 coordinator.update_interval = timedelta(seconds=new_interval)
 
             return self.async_create_entry(title="", data={
-                **self._config_entry.options,
+                **self.config_entry.options,
                 **user_input,
                 CONF_REGISTERS: self._registers
             })
 
-        current_interval = self._config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
+        current_interval = self.config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
         
         return self.async_show_form(
             step_id="settings",
@@ -65,7 +65,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             # Update the entry with the new list and return to init
             return self.async_create_entry(
                 title="", 
-                data={**self._config_entry.options, CONF_REGISTERS: self._registers}
+                data={**self.config_entry.options, CONF_REGISTERS: self._registers}
             )
 
         return self.async_show_form(
