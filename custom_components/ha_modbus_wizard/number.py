@@ -5,6 +5,7 @@ from .const import DOMAIN #, CONF_NAME
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.config_entries import ConfigEntry
 from typing import Any
+import logging
 
 _LOGGER = logging.getLogger(__name__)
 
