@@ -9,7 +9,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = [
         ModbusWizardNumber(coordinator, entry, reg["name"].lower().replace(" ", "_"), reg)
         for reg in entry.options.get("registers", [])
-        if reg.get("rw") == "write" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32")
+        if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32")
     ]
     
     async_add_entities(entities)
