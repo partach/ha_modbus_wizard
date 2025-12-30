@@ -32,7 +32,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
         self.client = client
         self.slave_id = slave_id
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
         self._lock = asyncio.Lock()
 
@@ -218,7 +218,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         if not await self._async_connect():
             raise UpdateFailed("Could not connect to Modbus device")
 
-        registers = self.config_entry.options.get("registers", [])
+        registers = self._config_entry.options.get("registers", [])
         updated_registers = [dict(reg) for reg in registers]
         options_changed = False
         new_data = {}
@@ -295,8 +295,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
         if options_changed:
             self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                options={**self.config_entry.options, "registers": updated_registers},
+                self._config_entry,
+                options={**self._config_entry.options, "registers": updated_registers},
             )
 
         if not new_data:
