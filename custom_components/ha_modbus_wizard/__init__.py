@@ -117,14 +117,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hubs[hub_key] = ModbusTcpHub(hass, host, port)
 
     hub = hubs[hub_key]
-    update_interval = config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
+    update_interval = entry.options.get(CONF_UPDATE_INTERVAL, 10)
     # Create coordinator
     coordinator = ModbusWizardCoordinator(
         hass=hass,
         client=hub.client,
         slave_id=config[CONF_SLAVE_ID],
         config_entry=entry,
-        update_interval=timedelta(seconds=update_interval_seconds),
+        update_interval=timedelta(seconds=update_interval),
     )
     
     # Store config and hub_key
