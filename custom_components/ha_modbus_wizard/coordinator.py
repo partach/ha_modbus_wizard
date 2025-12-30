@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 import asyncio
 from datetime import timedelta
-from typing import Any, List
-from struct import unpack
 from pymodbus.payload import BinaryPayloadDecoder
 from pymodbus.constants import Endian
 from homeassistant.core import HomeAssistant
@@ -86,6 +84,11 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.error("Write error at %s: %s", address, err)
             return False
+
+    async def async_read_registers(self, address: int, size: int = 1):
+        """Read holding registers."""
+        if not await self._async_connect():
+            return None
 
         async with self._lock:
             try:
