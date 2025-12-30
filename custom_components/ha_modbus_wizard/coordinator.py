@@ -5,7 +5,10 @@ from __future__ import annotations
 import logging
 import asyncio
 from datetime import timedelta
-from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
+from pymodbus.factory import (
+    BinaryPayloadDecoder,
+    BinaryPayloadBuilder,
+)
 from pymodbus.constants import Endian
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
