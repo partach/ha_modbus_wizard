@@ -35,8 +35,17 @@ async def async_setup_entry(
         # 2. Has predefined options
         if reg.get("rw") != "read" and reg.get("options"):
             entities.append(ModbusWizardSelect(coordinator, entry, key, reg))
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title or "Modbus Wizard",
+        manufacturer="Partach",
+        model="Wizard",
+        configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
+    )
 
     if entities:
+        for entity in entities:
+            entity._attr_device_info = device_info
         async_add_entities(entities, True)
 
 
@@ -73,15 +82,6 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
             self._value_to_label = {str(i): opt for i, opt in enumerate(options_data)}
             self._label_to_value = {opt: str(i) for i, opt in enumerate(options_data)}
             self._attr_options = list(options_data)
-
-        # Device info
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get(CONF_NAME, "Modbus Device"),
-            manufacturer="Modbus",
-            model="Wizard",
-            configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
-        )
 
     @property
     def current_option(self) -> str | None:
