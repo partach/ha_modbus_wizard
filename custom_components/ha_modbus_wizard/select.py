@@ -1,148 +1,121 @@
-"""Select entities for Modbus Wizard."""
+"""Dynamic Select entities for Modbus Wizard (HA-recommended pattern)."""
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.components.select import SelectEntity
 
-from .const import DOMAIN, CONF_REGISTERS #, CONF_NAME
+from .const import DOMAIN, CONF_REGISTERS
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up Modbus Wizard select entities."""
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
+
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title or "Modbus Wizard",
         manufacturer="Partach",
         model="Wizard",
     )
-    def update_entities():
-        entities = []
-        registers = entry.options.get(CONF_REGISTERS, [])
-        for reg in registers:
-            key = reg["name"].lower().replace(" ", "_")
-            if reg.get("rw", "read") != "read" and reg.get("options"):
-                entities.append(ModbusWizardSelect(coordinator, entry, key, reg, device_info))
-        if entities:
-            async_add_entities(entities, update=True)  # Replace existing with same unique_id
 
-    # Initial setup
-    update_entities()
+    entities: dict[str, ModbusWizardSelect] = {}
 
-    # Listen for options changes to dynamically update entities
-    entry.async_on_unload(
-        entry.add_listener(update_entities)
-    )
+    def _unique_id(reg: dict[str, Any]) -> str:
+        return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_select"
 
+    def _key(reg: dict[str, Any]) -> str:
+        return reg["name"].lower().strip().replace(" ", "_")
 
+    def _sync_entities() -> None:
+        current_regs = entry.options.get(CONF_REGISTERS, [])
+        desired_ids = set()
+        new_entities: list[Entity] = []
+
+        for reg in current_regs:
+            options = reg.get("options")
+            if not options:
+                continue
+
+            uid = _unique_id(reg)
+            desired_ids.add(uid)
+
+            if uid in entities:
+                continue
+
+            entity = ModbusWizardSelect(
+                coordinator=coordinator,
+                entry=entry,
+                unique_id=uid,
+                key=_key(reg),
+                info=reg,
+                device_info=device_info,
+            )
+            entities[uid] = entity
+            new_entities.append(entity)
+
+        if new_entities:
+            async_add_entities(new_entities)
+
+        for uid in list(entities):
+            if uid not in desired_ids:
+                entity = entities.pop(uid)
+                hass.async_create_task(entity.async_remove())
+
+        _LOGGER.info("Select sync complete — active=%d", len(entities))
+
+    _sync_entities()
+    entry.async_on_unload(entry.add_listener(lambda *_: _sync_entities()))
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
-    """Representation of a Modbus select entity with predefined options."""
     _attr_has_entity_name = True
     _attr_should_poll = False
-    
+
     def __init__(
         self,
         coordinator,
         entry: ConfigEntry,
+        unique_id: str,
         key: str,
         info: dict[str, Any],
         device_info: DeviceInfo,
-    ) -> None:
-        """Initialize the select entity."""
+    ):
         super().__init__(coordinator)
-        self._coordinator = coordinator
-        self._entry = entry
         self._key = key
         self._info = info
-        self._attr_device_info = device_info
-        # Entity attributes
-        self._attr_unique_id = f"{entry.entry_id}_{key}"
-        self._attr_name = info["name"]
-        self._attr_icon = info.get("icon")
 
-        # Parse options - can be dict {value: label} or list ["opt1", "opt2"]
-        options_data = info.get("options", {})
-        if isinstance(options_data, dict):
-            self._value_to_label = options_data
-            self._label_to_value = {v: k for k, v in options_data.items()}
-            self._attr_options = list(options_data.values())
-        else:
-            # List of strings - label and value are the same
-            self._value_to_label = {str(i): opt for i, opt in enumerate(options_data)}
-            self._label_to_value = {opt: str(i) for i, opt in enumerate(options_data)}
-            self._attr_options = list(options_data)
+        self._attr_unique_id = unique_id
+        self._attr_name = info.get("name")
+        self._attr_device_info = device_info
+
+        # options expected as mapping {"0": "Off", "1": "On"}
+        self._value_map = {str(k): v for k, v in info.get("options", {}).items()}
+        self._reverse_map = {v: k for k, v in self._value_map.items()}
+
+        self._attr_options = list(self._reverse_map.keys())
 
     @property
-    def current_option(self) -> str | None:
-        """Return the current selected option."""
-        raw_value = self.coordinator.data.get(self._key)
-        if raw_value is None:
-            return None
-
-        # Convert raw modbus value to label
-        value_str = str(raw_value)
-        return self._value_to_label.get(value_str, self._attr_options[0] if self._attr_options else None)
+    def current_option(self):
+        raw = self.coordinator.data.get(self._key)
+        return self._value_map.get(str(raw))
 
     async def async_select_option(self, option: str) -> None:
-        """Change the selected option."""
-        if option not in self._label_to_value:
-            _LOGGER.error("Invalid option '%s' for %s", option, self._attr_name)
+        value = self._reverse_map.get(option)
+        if value is None:
             return
 
-        # Get the modbus value for this option
-        modbus_value = self._label_to_value[option]
-
-        # Convert to appropriate type based on data_type
-        data_type = self._info.get("data_type", "uint16")
-        
-        try:
-            if data_type in ("uint16", "uint32", "uint"):
-                modbus_value = int(modbus_value)
-            elif data_type in ("int16", "int32", "int"):
-                modbus_value = int(modbus_value)
-            elif data_type == "float32":
-                modbus_value = float(modbus_value)
-        except (ValueError, TypeError):
-            _LOGGER.error("Could not convert '%s' to %s", modbus_value, data_type)
-            return
-
-        # Write to modbus
-        success = await self._coordinator.async_write_registers(
-            address=self._info["address"],
-            value=modbus_value,
-            data_type=data_type,
+        await self.coordinator.async_write_registers(
+            address=int(self._info["address"]),
+            value=int(value),
+            data_type=self._info.get("data_type", "uint16"),
             byte_order=self._info.get("byte_order", "big"),
             word_order=self._info.get("word_order", "big"),
         )
-
-        if not success:
-            _LOGGER.error("Failed to write option '%s' to register %d", option, self._info["address"])
-            return
-
-        # Refresh coordinator to get updated state
-        await self._coordinator.async_request_refresh()
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
-
-    async def async_added_to_hass(self) -> None:
-        """Handle entity added to hass."""
-        await super().async_added_to_hass()
-        _LOGGER.debug("Select %s added to hass", self._attr_name)
+        await self.coordinator.async_request_refresh()
