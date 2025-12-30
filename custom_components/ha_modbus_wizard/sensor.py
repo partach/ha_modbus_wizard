@@ -28,6 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entities.append(ModbusWizardSensor(coordinator, entry, key, reg, device_info))
         if entities:
             async_add_entities(entities, update=True)  # Replace existing with same unique_id
+        _LOGGER.info("update_entities called — registers: %s", len(entry.options.get("registers", [])))
 
     # Initial setup
     update_entities()
