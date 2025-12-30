@@ -71,7 +71,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         _LOGGER.info("Select sync complete — active=%d", len(entities))
 
     _sync_entities()
-    entry.async_on_unload(entry.add_listener(lambda *_: _sync_entities()))
+    entry.async_on_unload(entry.async_add_listener(lambda *_: _sync_entities()))
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
