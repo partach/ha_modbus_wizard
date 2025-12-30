@@ -177,7 +177,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     result = await method(
                         address=address,
                         count=size,
-                        unit=self.slave_id,
+                        device_id=self.slave_id,
                     )
                 except Exception as err:
                     _LOGGER.error("Read failed for %s register at %d: %s", register_type, address, err)
