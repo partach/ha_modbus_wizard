@@ -258,6 +258,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         finally:
             if client:
                 try:
-                   await client.close()
+                   client.close()
                 except Exception as err:
                     _LOGGER.debug("Error closing Modbus client: %s", err)
