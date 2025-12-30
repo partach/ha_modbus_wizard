@@ -25,7 +25,6 @@ class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._key = key
         self._info = info
-        self.entity_id = f"sensor.{entry.entry_id}_{key}"
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_name = info["name"]
         self._attr_device_class = info.get("device_class")
