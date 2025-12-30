@@ -4,7 +4,6 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 # from pymodbus.exceptions import ModbusException, ConnectionException
-from .const import CONF_UPDATE_INTERVAL
 from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
