@@ -8,6 +8,7 @@ from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from .const import CONF_REGISTERS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             # === RAW MODE ===
             if raw:
                 return {
-                    "registers": getattr(result, "registers", []),
+                    "registers": getattr(result, "registers", []), # default data word, not part of options
                     "bits": getattr(result, "bits", [])[:size],
                     "detected_type": register_type,
                 }
@@ -218,7 +219,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         if not await self._async_connect():
             raise UpdateFailed("Could not connect to Modbus device")
 
-        registers = self.my_config_entry.options.get("registers", [])
+        registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
         if not registers:
             _LOGGER.info("No registers yet defined")
             return {}
@@ -299,7 +300,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         if options_changed:
             self.hass.config_entries.async_update_entry(
                 self.my_config_entry,
-                options={**self.my_config_entry.options, "registers": updated_registers},
+                options={**self.my_config_entry.options, CONF_REGISTERS: updated_registers},
             )
 
         if not new_data:
