@@ -2,7 +2,7 @@
 import os
 import shutil
 import logging
-
+from homeassistant.helpers import device_registry as dr
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -154,7 +154,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN]["coordinators"][entry.entry_id] = coordinator
-
+    # CREATE DEVICE REGISTRY ENTRY
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.data.get(CONF_NAME, "Modbus Device"),
+        manufacturer="Modbus",
+        model="Wizard",
+        configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
+    )
     # ----------------------------------------------------------------
     # Platforms
     # ----------------------------------------------------------------
