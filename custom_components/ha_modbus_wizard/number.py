@@ -1,7 +1,7 @@
 """Number entities for Modbus Wizard."""
 from homeassistant.components.number import NumberEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN
+from .const import DOMAIN, CONF_NAME
 from homeassistant.helpers.entity import DeviceInfo
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -13,18 +13,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32")
     ]
     
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title or "Modbus Wizard",
-        manufacturer="Partach",
-        model="Wizard",
-        configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
-    )
-
-    if entities:
-        for entity in entities:
-            entity._attr_device_info = device_info
-        async_add_entities(entities)
+    async_add_entities(entities)
 
 class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
     def __init__(self, coordinator, entry, key, info):
@@ -37,7 +26,12 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_min_value = info.get("min", 0)
         self._attr_native_max_value = info.get("max", 65535)
         self._attr_native_step = info.get("step", 1)
-
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": entry.data.get(CONF_NAME, "Modbus Device"),
+            "manufacturer": "Partach",
+            "model": "Wizard",
+        }
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
