@@ -1,6 +1,6 @@
 write_register:
   name: Write Register
-  description: Write a value to a specific Modbus register.
+  description: Write a typed value to a Modbus register with proper packing.
   target:
     entity:
       integration: modbus_wizard
@@ -16,23 +16,58 @@ write_register:
           min: 0
           max: 65535
           step: 1
+
     value:
       name: Value
-      description: Value to write (integer or float based on register type).
+      description: Value to write (will be packed according to data type).
       required: true
       selector:
         text:
-    size:
-      name: Size
-      description: Number of registers to write (1-4).
+
+    data_type:
+      name: Data Type
+      description: How the value should be encoded.
       required: false
-      default: 1
+      default: uint16
       selector:
-        number:
-          mode: box
-          min: 1
-          max: 4
-          step: 1
+        select:
+          options:
+            - label: Unsigned 16-bit
+              value: uint16
+            - label: Signed 16-bit
+              value: int16
+            - label: Unsigned 32-bit
+              value: uint32
+            - label: Signed 32-bit
+              value: int32
+            - label: Float 32-bit
+              value: float32
+
+    byte_order:
+      name: Byte Order
+      description: Byte order inside a register.
+      required: false
+      default: big
+      selector:
+        select:
+          options:
+            - label: Big Endian (AB)
+              value: big
+            - label: Little Endian (BA)
+              value: little
+
+    word_order:
+      name: Word Order
+      description: Register order for multi-register values.
+      required: false
+      default: big
+      selector:
+        select:
+          options:
+            - label: Big Endian (AB CD)
+              value: big
+            - label: Little Endian (CD AB)
+              value: little
 
 read_register:
   name: Read Register
