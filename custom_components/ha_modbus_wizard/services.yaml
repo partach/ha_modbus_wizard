@@ -71,31 +71,36 @@ write_register:
 
 read_register:
   name: Read Register
-  description: Read one or more Modbus registers.
+  description: Read a Modbus register with data type decoding.
   target:
     entity:
       integration: modbus_wizard
   fields:
     address:
-      name: Register Address
-      description: Modbus register address.
       required: true
-      example: 100
       selector:
         number:
-          mode: box
           min: 0
           max: 65535
-          step: 1
-
-    size:
-      name: Register Count
-      description: Number of registers to read.
-      required: false
-      default: 1
+    data_type:
+      required: true
       selector:
-        number:
-          mode: box
-          min: 1
-          max: 4
-          step: 1
+        select:
+          options:
+            - uint16
+            - int16
+            - uint32
+            - int32
+            - float32
+    byte_order:
+      required: false
+      default: big
+      selector:
+        select:
+          options: [big, little]
+    word_order:
+      required: false
+      default: big
+      selector:
+        select:
+          options: [big, little]
