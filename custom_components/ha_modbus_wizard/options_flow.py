@@ -31,43 +31,57 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             },
         )
 
-
-    async def async_step_settings(self, user_input=None):
-        """Manage global settings like update interval."""
-        if user_input is not None:
-            # Update the coordinator immediately if it exists
-            if DOMAIN in self.hass.data and self.my_config_entry.entry_id in self.hass.data[DOMAIN]:
-                coordinator = self.hass.data[DOMAIN][self.my_config_entry.entry_id]
-                new_interval = user_input.get(CONF_UPDATE_INTERVAL, 10)
-                coordinator.update_interval = timedelta(seconds=new_interval)
-
-            return self.async_create_entry(title="", data={
+    def _save_options(self):
+        self.hass.config_entries.async_update_entry(
+            self.my_config_entry,
+            options={
                 **self.my_config_entry.options,
-                **user_input,
-                CONF_REGISTERS: self._registers
-            })
-
-        current_interval = self.my_config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
+                CONF_REGISTERS: self._registers,
+            },
+        )
         
+    async def async_step_settings(self, user_input=None):
+        if user_input is not None:
+            new_interval = user_input[CONF_UPDATE_INTERVAL]
+    
+            self.hass.config_entries.async_update_entry(
+                self.my_config_entry,
+                options={
+                    **self.my_config_entry.options,
+                    CONF_UPDATE_INTERVAL: new_interval,
+                    CONF_REGISTERS: self._registers,
+                },
+            )
+    
+            coordinator = (
+                self.hass.data
+                .get(DOMAIN, {})
+                .get("coordinators", {})
+                .get(self.my_config_entry.entry_id)
+            )
+            if coordinator:
+                coordinator.update_interval = timedelta(seconds=new_interval)
+    
+            return self.async_create_entry(title="", data={})
+    
+        current_interval = self.my_config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
+    
         return self.async_show_form(
             step_id="settings",
             data_schema=vol.Schema({
                 vol.Required(CONF_UPDATE_INTERVAL, default=current_interval): vol.All(
                     vol.Coerce(int),
-                    vol.Range(min=5, max=300)
+                    vol.Range(min=5, max=300),
                 ),
-            })
+            }),
         )
 
     async def async_step_add_register(self, user_input=None):
         """Add a new register definition."""
         if user_input is not None:
             self._registers.append(user_input)
-            # Update the entry with the new list and return to init
-            return self.async_create_entry(
-                title="", 
-                data={**self.my_config_entry.options, CONF_REGISTERS: self._registers}
-            )
+            self._save_options()
+            return await self.async_step_init()
 
         return self.async_show_form(
             step_id="add_register",
@@ -103,17 +117,14 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     async def async_step_list_registers(self, user_input=None):
         """View and delete registers."""
         if user_input is not None:
-            # If user selected registers to delete
             to_delete = user_input.get("delete_registers", [])
             if to_delete:
                 self._registers = [
-                    r for r in self._registers 
+                    r for r in self._registers
                     if f"{r['name']} (@{r['address']})" not in to_delete
                 ]
-                return self.async_create_entry(
-                    title="", 
-                    data={**self.my_config_entry.options, CONF_REGISTERS: self._registers}
-                )
+                self._save_options()
+        
             return await self.async_step_init()
         
         # Create list of display strings for the selector
