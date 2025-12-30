@@ -43,16 +43,6 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     async def async_step_settings(self, user_input=None):
         if user_input is not None:
             new_interval = user_input[CONF_UPDATE_INTERVAL]
-    
-            self.hass.config_entries.async_update_entry(
-                self.my_config_entry,
-                options={
-                    **self.my_config_entry.options,
-                    CONF_UPDATE_INTERVAL: new_interval,
-                    CONF_REGISTERS: self._registers,
-                },
-            )
-    
             coordinator = (
                 self.hass.data
                 .get(DOMAIN, {})
