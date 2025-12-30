@@ -23,7 +23,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up Modbus Wizard select entities."""
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
-
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title or "Modbus Wizard",
+        manufacturer="Partach",
+        model="Wizard",
+    )
     entities = []
 
     # Create select entities for writable registers with predefined options
@@ -34,9 +39,9 @@ async def async_setup_entry(
         # 1. Register is writable
         # 2. Has predefined options
         if reg.get("rw") != "read" and reg.get("options"):
-            entities.append(ModbusWizardSelect(coordinator, entry, key, reg))
-    
-    async_add_entities(entities, update=True)
+            entities.append(ModbusWizardSelect(coordinator, entry, key, reg, device_info))
+    if entities:
+      async_add_entities(entities, update=True)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
@@ -48,6 +53,7 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
         entry: ConfigEntry,
         key: str,
         info: dict[str, Any],
+        device_info: DeviceInfo,
     ) -> None:
         """Initialize the select entity."""
         super().__init__(coordinator)
@@ -55,12 +61,7 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
         self._entry = entry
         self._key = key
         self._info = info
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": entry.data.get(CONF_NAME, "Modbus Device"),
-            "manufacturer": "Partach",
-            "model": "Wizard",
-        }
+        self._attr_device_info = device_info
         # Entity attributes
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_name = info["name"]
@@ -132,3 +133,8 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         return self.coordinator.last_update_success
+
+    async def async_added_to_hass(self) -> None:
+        """Handle entity added to hass."""
+        await super().async_added_to_hass()
+        _LOGGER.debug("Select %s added to hass", self._attr_name)
