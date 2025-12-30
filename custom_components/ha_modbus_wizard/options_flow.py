@@ -114,7 +114,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             })
         )
 
-        async def async_step_list_registers(self, user_input=None):
+    async def async_step_list_registers(self, user_input=None):
         """View and delete registers."""
         if user_input is not None:
             # If user selected registers to delete
