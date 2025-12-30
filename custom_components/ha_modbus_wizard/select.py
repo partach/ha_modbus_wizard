@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_NAME
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,18 +35,7 @@ async def async_setup_entry(
         # 2. Has predefined options
         if reg.get("rw") != "read" and reg.get("options"):
             entities.append(ModbusWizardSelect(coordinator, entry, key, reg))
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title or "Modbus Wizard",
-        manufacturer="Partach",
-        model="Wizard",
-        configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
-    )
-
-    if entities:
-        for entity in entities:
-            entity._attr_device_info = device_info
-        async_add_entities(entities)
+    async_add_entities(entities)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
@@ -65,7 +54,12 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
         self._entry = entry
         self._key = key
         self._info = info
-
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": entry.data.get(CONF_NAME, "Modbus Device"),
+            "manufacturer": "Partach",
+            "model": "Wizard",
+        }
         # Entity attributes
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_name = info["name"]
