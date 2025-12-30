@@ -219,6 +219,9 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             raise UpdateFailed("Could not connect to Modbus device")
 
         registers = self.my_config_entry.options.get("registers", [])
+        if not registers:
+            _LOGGER.info("No registers yet defined")
+            return {}
         updated_registers = [dict(reg) for reg in registers]
         options_changed = False
         new_data = {}
