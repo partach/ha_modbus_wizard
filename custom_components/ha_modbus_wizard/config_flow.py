@@ -52,7 +52,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> ModbusWizardOptionsFlowHandler:
+    def async_get_options_flow(config_entry: ConfigEntry):
         """Get the options flow for this handler."""
         return ModbusWizardOptionsFlow(config_entry)
 
