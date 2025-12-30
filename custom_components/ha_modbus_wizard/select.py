@@ -46,7 +46,7 @@ async def async_setup_entry(
     if entities:
         for entity in entities:
             entity._attr_device_info = device_info
-        async_add_entities(entities, True)
+        async_add_entities(entities)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
