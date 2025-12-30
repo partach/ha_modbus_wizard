@@ -1,18 +1,23 @@
-"""Number entities for Modbus Wizard."""
-from homeassistant.components.number import NumberEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN #, CONF_NAME
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.config_entries import ConfigEntry
-from typing import Any
+"""Dynamic Number entities for Modbus Wizard (HA-recommended pattern)."""
+from __future__ import annotations
+
 import logging
-from .const import CONF_REGISTERS 
+from typing import Any
+
+from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.components.number import NumberEntity
+
+from .const import DOMAIN, CONF_REGISTERS
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass, entry, async_add_entities):
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
-    
+
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title or "Modbus Wizard",
@@ -20,57 +25,90 @@ async def async_setup_entry(hass, entry, async_add_entities):
         model="Wizard",
     )
 
-    # Initial entity creation
-    def update_entities():
-        entities = []
-        registers = entry.options.get(CONF_REGISTERS, [])
-        for reg in registers:
-            key = reg["name"].lower().replace(" ", "_")
-            if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32"):
-                entities.append(ModbusWizardNumber(coordinator, entry, key, reg, device_info))
-        if entities:
-            async_add_entities(entities, update=True)  # Replace existing with same unique_id
+    entities: dict[str, ModbusWizardNumber] = {}
 
-    # Initial setup
-    update_entities()
+    def _unique_id(reg: dict[str, Any]) -> str:
+        return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_number"
 
-    # Listen for options changes to dynamically update entities
-    entry.async_on_unload(
-        entry.add_listener(update_entities)
-    )
+    def _key(reg: dict[str, Any]) -> str:
+        return reg["name"].lower().strip().replace(" ", "_")
+
+    def _sync_entities() -> None:
+        current_regs = entry.options.get(CONF_REGISTERS, [])
+        desired_ids = set()
+        new_entities: list[Entity] = []
+
+        for reg in current_regs:
+            if reg.get("rw") not in ("write", "rw"):
+                continue
+
+            uid = _unique_id(reg)
+            desired_ids.add(uid)
+
+            if uid in entities:
+                continue
+
+            entity = ModbusWizardNumber(
+                coordinator=coordinator,
+                entry=entry,
+                unique_id=uid,
+                key=_key(reg),
+                info=reg,
+                device_info=device_info,
+            )
+            entities[uid] = entity
+            new_entities.append(entity)
+
+        if new_entities:
+            async_add_entities(new_entities)
+
+        for uid in list(entities):
+            if uid not in desired_ids:
+                entity = entities.pop(uid)
+                hass.async_create_task(entity.async_remove())
+
+        _LOGGER.info("Number sync complete — active=%d", len(entities))
+
+    _sync_entities()
+    entry.async_on_unload(entry.add_listener(lambda *_: _sync_entities()))
+
 
 class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
     _attr_has_entity_name = True
     _attr_should_poll = False
-    
-    def __init__(self, coordinator, entry: ConfigEntry, key: str, info: dict[str, Any], device_info: DeviceInfo):
+
+    def __init__(
+        self,
+        coordinator,
+        entry: ConfigEntry,
+        unique_id: str,
+        key: str,
+        info: dict[str, Any],
+        device_info: DeviceInfo,
+    ):
         super().__init__(coordinator)
         self._key = key
         self._info = info
-        self._attr_unique_id = f"{entry.entry_id}_{key}"
-        self._attr_name = info["name"]
+
+        self._attr_unique_id = unique_id
+        self._attr_name = info.get("name")
         self._attr_native_unit_of_measurement = info.get("unit")
-        self._attr_native_min_value = info.get("min", 0)
-        self._attr_native_max_value = info.get("max", 65535)
-        self._attr_native_step = info.get("step", 1)
         self._attr_device_info = device_info
+
+        self._attr_min_value = info.get("min")
+        self._attr_max_value = info.get("max")
+        self._attr_step = info.get("step", 1)
+
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
 
-    async def async_set_native_value(self, value: float):
+    async def async_set_native_value(self, value: float) -> None:
         await self.coordinator.async_write_registers(
-            address=self._info["address"],
+            address=int(self._info["address"]),
             value=value,
             data_type=self._info.get("data_type", "uint16"),
+            byte_order=self._info.get("byte_order", "big"),
+            word_order=self._info.get("word_order", "big"),
         )
         await self.coordinator.async_request_refresh()
-            
-    @property
-    def available(self):
-        return self.coordinator.last_update_success
-        
-    async def async_added_to_hass(self) -> None:
-        """Handle entity added to hass."""
-        await super().async_added_to_hass()
-        _LOGGER.debug("Number %s added to hass", self._attr_name)
