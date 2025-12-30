@@ -215,22 +215,37 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("Write failed")
     
     async def handle_read_register(call: ServiceCall):
+        """Service to read a Modbus register and return decoded value."""
+        # Required
         address = int(call.data["address"])
-        data_type = call.data["data_type"]
+    
+        # Optional with defaults
+        register_type = call.data.get("register_type", "holding").lower()  # holding, input, coil, discrete, auto
+        data_type = call.data.get("data_type", "uint16")
+        size = int(call.data.get("size", 1))  # Override size (e.g., for float32 = 2)
         byte_order = call.data.get("byte_order", "big")
         word_order = call.data.get("word_order", "big")
+        raw = call.data.get("raw", False)  # Return raw registers if True
     
         coordinator = _get_coordinator(call)
+        if coordinator is None:
+            raise HomeAssistantError("No coordinator found for this device")
+    
+        # Use the full polling logic for consistency (handles auto-detect, etc.)
+        # Or call a new helper — but reuse existing logic if possible
     
         value = await coordinator.async_read_typed(
             address=address,
             data_type=data_type,
             byte_order=byte_order,
             word_order=word_order,
+            size=size,
+            register_type=register_type,  # ← Pass type
+            raw=raw,
         )
     
         if value is None:
-            raise HomeAssistantError("Read failed")
+            raise HomeAssistantError(f"Failed to read address {address}")
     
         return {"value": value}
         
