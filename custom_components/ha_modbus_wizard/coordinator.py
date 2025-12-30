@@ -243,15 +243,22 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # De/encoding
     # ------------------------------------------------------------------
     def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
+        if data_type == "uint":
+            return registers[0] if len(registers) == 1 else sum(r << (16 * i) for i, r in enumerate(registers))
+        if data_type == "int" and len(registers) == 1:
+            val = registers[0]
+            return val if val < 32768 else val - 65536
+        
+        # Multi-register types use decoder
         decoder = BinaryPayloadDecoder.fromRegisters(
             registers,
             byteorder=Endian.BIG if byte_order == "big" else Endian.LITTLE,
             wordorder=Endian.BIG if word_order == "big" else Endian.LITTLE,
         )
-    
-        if data_type == "int16":
+        
+        if data_type in ("int16", "int"):
             return decoder.decode_16bit_int()
-        if data_type == "uint16":
+        if data_type in ("uint16", "uint"):
             return decoder.decode_16bit_uint()
         if data_type == "int32":
             return decoder.decode_32bit_int()
