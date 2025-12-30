@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN #, CONF_NAME
+from .const import DOMAIN, CONF_REGISTERS #, CONF_NAME
 import logging
 from typing import Any
 
@@ -21,14 +21,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     )    
     def update_entities():
         entities = []
-        registers = entry.options.get("registers", [])
+        registers = entry.options.get(CONF_REGISTERS, [])
         for reg in registers:
             key = reg["name"].lower().replace(" ", "_")
             if reg.get("rw", "read") == "read":
                 entities.append(ModbusWizardSensor(coordinator, entry, key, reg, device_info))
         if entities:
             async_add_entities(entities, update=True)  # Replace existing with same unique_id
-        _LOGGER.info("update_entities called — registers: %s", len(entry.options.get("registers", [])))
+        _LOGGER.info("update_entities called — registers: %s", len(entry.options.get(CONF_REGISTERS, [])))
 
     # Initial setup
     update_entities()
