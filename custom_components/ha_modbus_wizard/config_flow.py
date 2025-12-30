@@ -1,7 +1,7 @@
 """Config flow for Modbus Wizard."""
 import logging
 from typing import Any
-from datetime import timedelta
+#from datetime import timedelta
 import serial.tools.list_ports
 import voluptuous as vol
 
