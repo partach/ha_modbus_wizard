@@ -8,6 +8,11 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+    _LOGGER.error(
+        "sensor setup entry %s, registers=%s",
+        entry.entry_id,
+        entry.options.get("registers"),
+    )
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
     
     entities = []
@@ -17,7 +22,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entities.append(ModbusWizardSensor(coordinator, entry, key, reg))
         # Add number/select for write...
 
-    async_add_entities(entities)
+    async_add_entities(entities,True)
 
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry, key, info):
@@ -34,6 +39,11 @@ class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
             "manufacturer": "Modbus",
             "model": "Wizard",
         }
+        
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
+        
+    @property
+    def available(self):
+        return self.coordinator.last_update_success
