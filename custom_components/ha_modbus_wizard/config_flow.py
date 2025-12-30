@@ -1,7 +1,7 @@
 """Config flow for Modbus Wizard."""
 import logging
 from typing import Any
-
+from datetime import timedelta
 import serial.tools.list_ports
 import voluptuous as vol
 
@@ -65,7 +65,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_serial()
             return await self.async_step_tcp()
         current_interval = self.config_entry.options.get(
-            CONF_UPDATE_INTERVAL, 10  # your default value in seconds
+            CONF_UPDATE_INTERVAL, timedelta(seconds=10)  # your default value in seconds
         )
         return self.async_show_form(
             step_id="user",
