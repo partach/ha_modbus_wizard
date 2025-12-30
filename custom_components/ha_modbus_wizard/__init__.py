@@ -216,16 +216,25 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     
     async def handle_read_register(call: ServiceCall):
         address = int(call.data["address"])
-        size = int(call.data.get("size", 1))
+        data_type = call.data["data_type"]
+        byte_order = call.data.get("byte_order", "big")
+        word_order = call.data.get("word_order", "big")
     
         coordinator = _get_coordinator(call)
-        value = await coordinator.async_read_registers(address, size)
+    
+        value = await coordinator.async_read_typed(
+            address=address,
+            data_type=data_type,
+            byte_order=byte_order,
+            word_order=word_order,
+        )
     
         if value is None:
             raise HomeAssistantError("Read failed")
     
         return {"value": value}
         
+    # register the services    
     hass.services.async_register(DOMAIN, "write_register", handle_write_register)
     hass.services.async_register(DOMAIN, "read_register", handle_read_register)
 
