@@ -64,9 +64,6 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_SERIAL:
                 return await self.async_step_serial()
             return await self.async_step_tcp()
-        current_interval = self.config_entry.options.get(
-            CONF_UPDATE_INTERVAL, timedelta(seconds=10)  # your default value in seconds
-        )
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
@@ -107,7 +104,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Required(
                         CONF_UPDATE_INTERVAL,
-                        default=current_interval,
+                        default=10,
                     ): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=5, max=300),  # 5 seconds to 5 minutes
