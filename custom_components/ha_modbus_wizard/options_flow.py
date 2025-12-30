@@ -94,6 +94,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN
                     )
                 ),
+                vol.Optional("options"): str,  # User can enter JSON like: {"0": "Off", "1": "On"}
                 vol.Optional("unit"): str,
             })
         )
