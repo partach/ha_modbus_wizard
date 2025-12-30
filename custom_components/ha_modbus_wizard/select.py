@@ -35,7 +35,8 @@ async def async_setup_entry(
         # 2. Has predefined options
         if reg.get("rw") != "read" and reg.get("options"):
             entities.append(ModbusWizardSelect(coordinator, entry, key, reg))
-    async_add_entities(entities)
+    
+    async_add_entities(entities, update=True)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
