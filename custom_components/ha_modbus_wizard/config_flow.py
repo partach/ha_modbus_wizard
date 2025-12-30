@@ -222,9 +222,9 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not client.connected:
                 raise ConnectionError("Failed to connect to Modbus device")
 
-            address = data[CONF_FIRST_REG]
-            count = data[CONF_FIRST_REG_SIZE]
-            slave_id = data[CONF_SLAVE_ID]
+            address = int(data[CONF_FIRST_REG])
+            count = int(data[CONF_FIRST_REG_SIZE])
+            slave_id = int(data[CONF_SLAVE_ID])
 
             methods = [
                 ("holding registers", client.read_holding_registers),
