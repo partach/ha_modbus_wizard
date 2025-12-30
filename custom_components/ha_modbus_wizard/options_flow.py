@@ -19,7 +19,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Modbus Wizard."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
-        self.config_entry = config_entry
+        # self.config_entry = config_entry
         self._registers: list[dict] = list(config_entry.options.get(CONF_REGISTERS, []))
 
     async def async_step_init(self, user_input=None):
