@@ -4,8 +4,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN,CONF_NAME
+from .const import DOMAIN #, CONF_NAME
 import logging
+from typing import Any
+
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
@@ -53,8 +55,8 @@ class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = info.get("unit")
         self._attr_entity_category = None
         self._attr_device_info = device_info
-        if info.get("state_class"):
-            self._attr_state_class = getattr(SensorStateClass, info["state_class"].upper())
+#        if info.get("state_class"):
+#            self._attr_state_class = getattr(SensorStateClass, info["state_class"].upper())
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
