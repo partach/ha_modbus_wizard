@@ -88,6 +88,12 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN
                     )
                 ),
+                vol.Required("rw", default="read"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["read", "write","rw"],
+                        mode=selector.SelectSelectorMode.DROPDOWN
+                    )
+                ),
                 vol.Optional("unit"): str,
             })
         )
