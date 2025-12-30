@@ -112,47 +112,55 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         data_type: str,
         byte_order: str = "big",
         word_order: str = "big",
+        size: int | None = None,
+        register_type: str = "holding",
+        raw: bool = False,
     ):
-        """Read and decode registers in one step using the new mixin logic."""
+        """Read and optionally decode a register with full options."""
         if not await self._async_connect():
             return None
-
-        # Map string keys to register counts
-        # (The actual decoding is handled by the unified _decode_value helper)
-        type_counts = {
-            "uint16": 1,
-            "int16": 1,
-            "uint32": 2,
-            "int32": 2,
-            "float32": 2,
-        }
-
-        if data_type not in type_counts:
-            raise ValueError(f"Unsupported data_type: {data_type}")
-
-        count = type_counts[data_type]
-
+    
+        # Determine size from data_type if not provided
+        if size is None:
+            type_sizes = {
+                "uint16": 1, "int16": 1,
+                "uint32": 2, "int32": 2, "float32": 2,
+                "uint64": 4, "int64": 4,
+            }
+            size = type_sizes.get(data_type, 1)
+    
         async with self._lock:
-            try:
-                result = await self.client.read_holding_registers(
-                    address=address,
-                    count=count,
-                    device_id=self.slave_id,
-                )
-
-                if result.isError():
+            result = None
+    
+            # Auto or direct type
+            if register_type == "auto":
+                # Reuse your auto-detect logic here (or call a helper)
+                result = await self._auto_read(address, size)
+            else:
+                method_map = {
+                    "holding": self.client.read_holding_registers,
+                    "input": self.client.read_input_registers,
+                    "coil": self.client.read_coils,
+                    "discrete": self.client.read_discrete_inputs,
+                }
+                method = method_map.get(register_type)
+                if not method:
+                    _LOGGER.error("Invalid register_type: %s", register_type)
                     return None
-
-                return self._decode_value(
-                    result.registers,
-                    data_type,
-                    byte_order,
-                    word_order,
-                )
-
-            except Exception as err:
-                _LOGGER.error("Typed read error at %s: %s", address, err)
-                return None           
+                result = await method(address=address, count=size, unit=self.slave_id)
+    
+            if result.isError():
+                return None
+    
+            if raw:
+                return {
+                    "registers": result.registers if hasattr(result, "registers") else [],
+                    "bits": result.bits if hasattr(result, "bits") else [],
+                }
+    
+            values = result.registers if hasattr(result, "registers") else result.bits[:size]
+    
+            return self._decode_value(values, data_type, byte_order, word_order)
 
     # ------------------------------------------------------------------
     # Polling
