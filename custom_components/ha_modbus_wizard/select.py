@@ -37,7 +37,7 @@ async def async_setup_entry(
             entities.append(ModbusWizardSelect(coordinator, entry, key, reg))
 
     if entities:
-        async_add_entities(entities)
+        async_add_entities(entities, True)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
