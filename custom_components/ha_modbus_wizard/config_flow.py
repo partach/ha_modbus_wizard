@@ -10,7 +10,7 @@ from homeassistant.helpers import selector
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
-
+from .options_flow import ModbusWizardOptionsFlow
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
@@ -50,11 +50,10 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._data: dict[str, Any] = {}
 
-    @classmethod
+    @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry):
+    def async_get_options_flow(config_entry: ConfigEntry) -> ModbusWizardOptionsFlowHandler:
         """Get the options flow for this handler."""
-        from .options_flow import ModbusWizardOptionsFlow
         return ModbusWizardOptionsFlow(config_entry)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
