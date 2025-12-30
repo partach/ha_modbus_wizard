@@ -87,8 +87,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     
         for idx, reg in enumerate(updated_registers):
             key = reg["name"].lower().replace(" ", "_")
-            address = reg["address"]
-            count = reg.get("size", 1)
+            address = int(reg["address"])  # just make sure these are integers else it is an issue
+            count = int(reg.get("size", 1))
             reg_type = reg.get("register_type", "holding")
     
             try:
