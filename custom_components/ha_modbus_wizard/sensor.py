@@ -9,11 +9,7 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    _LOGGER.error(
-        "sensor setup entry %s, registers=%s",
-        entry.entry_id,
-        entry.options.get("registers"),
-    )
+
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
     
     entities = []
@@ -22,39 +18,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if reg["rw"] == "read":
             entities.append(ModbusWizardSensor(coordinator, entry, key, reg))
  
-    device_info = DeviceInfo(
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title or "Modbus Wizard",
-        manufacturer="Partach",
-        model="Wizard",
-        configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
-    )
-
-    if entities:
-        for entity in entities:
-            entity._attr_device_info = device_info
-        async_add_entities(entities)
+    async_add_entities(entities, update=True)
 
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry, key, info):
         super().__init__(coordinator)
         self._key = key
         self._info = info
+        self.entity_id = f"sensor.{entry.entry_id}_{key}"
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_name = info["name"]
         self._attr_device_class = info.get("device_class")
         self._attr_native_unit_of_measurement = info.get("unit")
+        self._attr_entity_category = None
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": entry.data.get(CONF_NAME, "Modbus Device"),
-            "manufacturer": "Modbus",
+            "manufacturer": "Partach",
             "model": "Wizard",
         }
-        
+        if info.get("state_class"):
+            self._attr_state_class = getattr(SensorStateClass, info["state_class"].upper())
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
         
     @property
     def available(self):
-        return self.coordinator.last_update_success
+        return self.coordinator.last_update_success and self.coordinator.data is not None
