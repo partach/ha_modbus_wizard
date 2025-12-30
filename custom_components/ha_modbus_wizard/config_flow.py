@@ -29,6 +29,7 @@ from .const import (
     CONF_BYTESIZE,
     CONF_FIRST_REG,
     CONF_FIRST_REG_SIZE,
+    CONF_UPDATE_INTERVAL,
     DEFAULT_SLAVE_ID,
     DEFAULT_BAUDRATE,
     DEFAULT_TCP_PORT,
@@ -63,7 +64,9 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_SERIAL:
                 return await self.async_step_serial()
             return await self.async_step_tcp()
-
+        current_interval = self.config_entry.options.get(
+            CONF_UPDATE_INTERVAL, 10  # your default value in seconds
+        )
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
@@ -78,14 +81,36 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
-                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): vol.All(
-                        vol.Coerce(int), vol.Range(min=1, max=247)
+                    vol.Required(CONF_SLAVE_ID, default=DEFAULT_SLAVE_ID): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1,
+                            max=255,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
                     ),
-                    vol.Required(CONF_FIRST_REG, default=0): vol.All(
-                        vol.Coerce(int), vol.Range(min=0, max=65535)
+                     vol.Required(CONF_FIRST_REG, default=0): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=65535,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
                     ),
-                    vol.Required(CONF_FIRST_REG_SIZE, default=1): vol.All(
-                        vol.Coerce(int), vol.Range(min=1, max=20)
+                    vol.Required(CONF_FIRST_REG_SIZE, default=1): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1,
+                            max=20,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_UPDATE_INTERVAL,
+                        default=current_interval,
+                    ): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=5, max=300),  # 5 seconds to 5 minutes
                     ),
                 }
             ),
