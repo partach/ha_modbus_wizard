@@ -3,7 +3,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.entity import DeviceInfo #, EntityCategory
+from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN,CONF_NAME
 import logging
 _LOGGER = logging.getLogger(__name__)
@@ -26,11 +26,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title or "Modbus Wizard",
         manufacturer="Partach",
+        model="Wizard",
         configuration_url=f"homeassistant://config/integrations/integration/{entry.entry_id}",
     )
-    for entity in entities:
-        entity._attr_device_info = device_info
-    async_add_entities(entities,True)
+
+    if entities:
+        for entity in entities:
+            entity._attr_device_info = device_info
+        async_add_entities(entities)
 
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator, entry, key, info):
