@@ -7,16 +7,37 @@ from homeassistant.helpers.entity import DeviceInfo
 async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN]["coordinators"][entry.entry_id]
     
-    entities = [
-        ModbusWizardNumber(coordinator, entry, reg["name"].lower().replace(" ", "_"), reg)
-        for reg in entry.options.get("registers", [])
-        if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32")
-    ]
-    
-    async_add_entities(entities)
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title or "Modbus Wizard",
+        manufacturer="Partach",
+        model="Wizard",
+    )
+
+    # Initial entity creation
+    def update_entities():
+        entities = []
+        registers = entry.options.get("registers", [])
+        for reg in registers:
+            key = reg["name"].lower().replace(" ", "_")
+            if reg.get("rw") != "read" and reg.get("data_type") in ("uint16", "int16", "uint32", "int32", "float32"):
+                entities.append(ModbusWizardNumber(coordinator, entry, key, reg, device_info))
+        if entities:
+            async_add_entities(entities, update=True)  # Replace existing with same unique_id
+
+    # Initial setup
+    update_entities()
+
+    # Listen for options changes to dynamically update entities
+    entry.async_on_unload(
+        entry.add_listener(update_entities)
+    )
 
 class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
-    def __init__(self, coordinator, entry, key, info):
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    
+    def __init__(self, coordinator, entry: ConfigEntry, key: str, info: dict[str, Any], device_info: DeviceInfo):
         super().__init__(coordinator)
         self._key = key
         self._info = info
@@ -26,12 +47,7 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_min_value = info.get("min", 0)
         self._attr_native_max_value = info.get("max", 65535)
         self._attr_native_step = info.get("step", 1)
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": entry.data.get(CONF_NAME, "Modbus Device"),
-            "manufacturer": "Partach",
-            "model": "Wizard",
-        }
+        self._attr_device_info = device_info
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
@@ -47,4 +63,8 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self):
         return self.coordinator.last_update_success
-
+        
+    async def async_added_to_hass(self) -> None:
+        """Handle entity added to hass."""
+        await super().async_added_to_hass()
+        _LOGGER.debug("Number %s added to hass", self._attr_name)
