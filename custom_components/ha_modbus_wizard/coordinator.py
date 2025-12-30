@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import asyncio
 from datetime import timedelta
-from pymodbus.constants import Endian
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -113,13 +112,13 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         byte_order: str = "big",
         word_order: str = "big",
         size: int | None = None,
-        register_type: str = "holding",
+        register_type: str = "auto",
         raw: bool = False,
-    ):
+    ) -> Any | None:
         """Read and optionally decode a register with full options."""
         if not await self._async_connect():
             return None
-    
+
         # Determine size from data_type if not provided
         if size is None:
             type_sizes = {
@@ -127,15 +126,39 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 "uint32": 2, "int32": 2, "float32": 2,
                 "uint64": 4, "int64": 4,
             }
-            size = type_sizes.get(data_type, 1)
-    
+            size = type_sizes.get(data_type.lower(), 1)
+
         async with self._lock:
             result = None
-    
-            # Auto or direct type
-            if register_type == "auto":
-                # Reuse your auto-detect logic here (or call a helper)
-                result = await self._auto_read(address, size)
+
+            # === AUTO DETECTION ===
+            if not register_type or register_type == "auto":
+                methods = [
+                    ("holding", self.client.read_holding_registers),
+                    ("input", self.client.read_input_registers),
+                    ("coil", self.client.read_coils),
+                    ("discrete", self.client.read_discrete_inputs),
+                ]
+
+                for name, method in methods:
+                    try:
+                        result = await method(
+                            address=address,
+                            count=size,
+                            device_id=self.slave_id,
+                        )
+                        if not result.isError():
+                            register_type = name  # Detected type
+                            break
+                    except Exception as inner_err:
+                        _LOGGER.debug("Auto test failed for %s at addr %d: %s", name, address, inner_err)
+                        result = None
+
+                if result is None or result.isError():
+                    _LOGGER.warning("Auto-detect failed for address %d (size %d)", address, size)
+                    return None
+
+            # === DIRECT READ ===
             else:
                 method_map = {
                     "holding": self.client.read_holding_registers,
@@ -143,24 +166,47 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     "coil": self.client.read_coils,
                     "discrete": self.client.read_discrete_inputs,
                 }
-                method = method_map.get(register_type)
-                if not method:
+                method = method_map.get(register_type.lower())
+                if method is None:
                     _LOGGER.error("Invalid register_type: %s", register_type)
                     return None
-                result = await method(address=address, count=size, unit=self.slave_id)
-    
-            if result.isError():
-                return None
-    
+
+                try:
+                    result = await method(
+                        address=address,
+                        count=size,
+                        unit=self.slave_id,
+                    )
+                except Exception as err:
+                    _LOGGER.error("Read failed for %s register at %d: %s", register_type, address, err)
+                    return None
+
+                if result.isError():
+                    return None
+
+            # === RAW MODE ===
             if raw:
                 return {
-                    "registers": result.registers if hasattr(result, "registers") else [],
-                    "bits": result.bits if hasattr(result, "bits") else [],
+                    "registers": getattr(result, "registers", []),
+                    "bits": getattr(result, "bits", [])[:size],
+                    "detected_type": register_type,
                 }
-    
-            values = result.registers if hasattr(result, "registers") else result.bits[:size]
-    
-            return self._decode_value(values, data_type, byte_order, word_order)
+
+            # === DECODE VALUES ===
+            if register_type in ("coil", "discrete"):
+                values = result.bits[:size]
+            else:
+                values = result.registers[:size]
+
+            if not values:
+                return None
+
+            return self._decode_value(
+                values,
+                data_type,
+                byte_order,
+                word_order,
+            )
 
     # ------------------------------------------------------------------
     # Polling
@@ -258,53 +304,46 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         return new_data
 
     # ------------------------------------------------------------------
-    # De/encoding
+    # De/encoding (Using Pymodbus Mixin String-based Endianness)
     # ------------------------------------------------------------------
     def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
-        """Decode registers using client mixin."""
-        # Simple bit-based types (Coils/Discrete) don't need decoding
+        """Decode registers using client mixin with string-based orders."""
         if not isinstance(registers, list) or len(registers) == 0:
             return registers
 
-        # Determine Pymodbus DATATYPE Enum
+        dt = self.client.DATATYPE
         dt_map = {
-            "uint16": self.client.DATATYPE.UINT16,
-            "int16": self.client.DATATYPE.INT16,
-            "uint32": self.client.DATATYPE.UINT32,
-            "int32": self.client.DATATYPE.INT32,
-            "float32": self.client.DATATYPE.FLOAT32,
-            "uint": self.client.DATATYPE.UINT16 if len(registers) == 1 else self.client.DATATYPE.UINT32,
-            "int": self.client.DATATYPE.INT16 if len(registers) == 1 else self.client.DATATYPE.INT32,
+            "uint16": dt.UINT16,
+            "int16": dt.INT16,
+            "uint32": dt.UINT32,
+            "int32": dt.INT32,
+            "float32": dt.FLOAT32,
+            "uint64": dt.UINT64,
+            "int64": dt.INT64,
         }
         
-        target_type = dt_map.get(data_type, self.client.DATATYPE.UINT16)
+        target_type = dt_map.get(data_type, dt.UINT16)
         
+        # Pymodbus 3.x mixin accepts "big" or "little" strings directly
         decoded = self.client.convert_from_registers(
             registers,
             data_type=target_type,
-            byte_order=Endian.BIG if byte_order == "big" else Endian.LITTLE,
-            word_order=Endian.BIG if word_order == "big" else Endian.LITTLE,
+            byte_order=byte_order.lower(),
+            word_order=word_order.lower(),
         )
 
-        if data_type == "float32":
+        if data_type == "float32" and isinstance(decoded, (int, float)):
             return round(decoded, 6)
         return decoded
 
     def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
-        """Encode value to registers using client mixin."""
+        """Encode value to registers using client mixin with string-based orders."""
+        dt = self.client.DATATYPE
         dt_map = {
-            "uint16": self.client.DATATYPE.UINT16,
-            "int16": self.client.DATATYPE.INT16,
-            "uint32": self.client.DATATYPE.UINT32,
-            "int32": self.client.DATATYPE.INT32,
-            "float32": self.client.DATATYPE.FLOAT32,
+            "uint16": dt.UINT16,
+            "int16": dt.INT16,
+            "uint32": dt.UINT32,
+            "int32": dt.INT32,
+            "float32": dt.FLOAT32,
         }
 
-        target_type = dt_map.get(data_type, self.client.DATATYPE.UINT16)
-
-        return self.client.convert_to_registers(
-            value,
-            data_type=target_type,
-            byte_order=Endian.BIG if byte_order == "big" else Endian.LITTLE,
-            word_order=Endian.BIG if word_order == "big" else Endian.LITTLE,
-        )
