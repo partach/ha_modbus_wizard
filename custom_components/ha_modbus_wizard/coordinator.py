@@ -6,7 +6,9 @@ import logging
 import asyncio
 from datetime import timedelta
 from typing import Any, List
-
+from struct import unpack
+from pymodbus.payload import BinaryPayloadDecoder
+from pymodbus.constants import Endian
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -57,30 +59,33 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # Services API
     # ------------------------------------------------------------------
 
-    async def async_write_registers(self, address: int, value: Any, size: int = 1) -> bool:
-        """Write holding registers."""
-        if size != 1:
-            raise HomeAssistantError("Multi-register write not implemented yet")
-
-        if not await self._async_connect():
+    async def async_write_registers(
+        self,
+        address: int,
+        value,
+        data_type: str = "uint16",
+        byte_order: str = "big",
+        word_order: str = "big",
+    ) -> bool:
+        try:
+            registers = self._encode_value(
+                value,
+                data_type,
+                byte_order,
+                word_order,
+            )
+    
+            result = await self.client.write_registers(
+                address=address,
+                values=registers,
+                device_id=self.slave_id,
+            )
+    
+            return not result.isError()
+    
+        except Exception as err:
+            _LOGGER.error("Write error at %s: %s", address, err)
             return False
-
-        async with self._lock:
-            try:
-                result = await self.client.write_registers(
-                    address=address,
-                    values=[value],
-                    device_id=self.slave_id,
-                )
-                return not result.isError()
-            except Exception as err:
-                _LOGGER.error("Write error at %s: %s", address, err)
-                return False
-
-    async def async_read_registers(self, address: int, size: int = 1):
-        """Read holding registers."""
-        if not await self._async_connect():
-            return None
 
         async with self._lock:
             try:
@@ -98,6 +103,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             except Exception as err:
                 _LOGGER.error("Read error at %s: %s", address, err)
                 return None
+                
 
     # ------------------------------------------------------------------
     # Polling
@@ -175,8 +181,9 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
                     new_data[key] = self._decode_value(
                         values,
-                        reg.get("data_type", "uint"),
-                        count,
+                        reg.get("data_type", "uint16"),
+                        reg.get("byte_order", "big"),
+                        reg.get("word_order", "big"),
                     )
 
                 except Exception as err:
@@ -194,13 +201,45 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         return new_data
 
     # ------------------------------------------------------------------
-    # Decoding
+    # De/encoding
     # ------------------------------------------------------------------
-
-    def _decode_value(self, values: List[int], data_type: str, size: int):
-        """Basic decoder (extend later)."""
-        if size == 1:
-            return values[0]
-
-        # Placeholder for future struct/float decoding
-        return values
+    def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
+        decoder = BinaryPayloadDecoder.fromRegisters(
+            registers,
+            byteorder=Endian.BIG if byte_order == "big" else Endian.LITTLE,
+            wordorder=Endian.BIG if word_order == "big" else Endian.LITTLE,
+        )
+    
+        if data_type == "int16":
+            return decoder.decode_16bit_int()
+        if data_type == "uint16":
+            return decoder.decode_16bit_uint()
+        if data_type == "int32":
+            return decoder.decode_32bit_int()
+        if data_type == "uint32":
+            return decoder.decode_32bit_uint()
+        if data_type == "float32":
+            return round(decoder.decode_32bit_float(), 6)
+    
+        raise ValueError(f"Unsupported data_type: {data_type}")
+        
+    def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
+        builder = BinaryPayloadBuilder(
+            byteorder=Endian.BIG if byte_order == "big" else Endian.LITTLE,
+            wordorder=Endian.BIG if word_order == "big" else Endian.LITTLE,
+        )
+    
+        if data_type == "int16":
+            builder.add_16bit_int(int(value))
+        elif data_type == "uint16":
+            builder.add_16bit_uint(int(value))
+        elif data_type == "int32":
+            builder.add_32bit_int(int(value))
+        elif data_type == "uint32":
+            builder.add_32bit_uint(int(value))
+        elif data_type == "float32":
+            builder.add_32bit_float(float(value))
+        else:
+            raise ValueError(f"Unsupported data_type: {data_type}")
+    
+        return builder.to_registers()
