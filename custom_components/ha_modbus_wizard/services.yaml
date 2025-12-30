@@ -70,37 +70,58 @@ write_register:
               value: little
 
 read_register:
-  name: Read Register
-  description: Read a Modbus register with data type decoding.
-  target:
-    entity:
-      integration: modbus_wizard
+  name: Read Modbus Register
+  description: Read and decode a Modbus register.
   fields:
     address:
+      name: Address
+      description: Register address (0-based)
       required: true
       selector:
         number:
           min: 0
           max: 65535
+          mode: box
+    register_type:
+      name: Register Type
+      description: Type of register
+      required: false
+      default: holding
+      selector:
+        select:
+          options: ["auto", "holding", "input", "coil", "discrete"]
     data_type:
-      required: true
+      name: Data Type
+      description: How to decode the value
+      required: false
+      default: uint16
       selector:
         select:
-          options:
-            - uint16
-            - int16
-            - uint32
-            - int32
-            - float32
+          options: ["uint16", "int16", "uint32", "int32", "float32", "string"]
+    size:
+      name: Size
+      description: Number of registers/bits (override auto)
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 20
+          mode: box
     byte_order:
-      required: false
+      name: Byte Order
       default: big
       selector:
         select:
-          options: [big, little]
+          options: ["big", "little"]
     word_order:
-      required: false
+      name: Word Order
       default: big
       selector:
         select:
-          options: [big, little]
+          options: ["big", "little"]
+    raw:
+      name: Raw Mode
+      description: Return raw registers/bits instead of decoded value
+      required: false
+      selector:
+        boolean:
