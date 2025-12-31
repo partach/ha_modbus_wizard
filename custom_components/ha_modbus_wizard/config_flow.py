@@ -228,12 +228,14 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 client = AsyncModbusUdpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
+                    framer=ModbusRtuFramer, # future extensions, give options for framer
                     timeout=5,
                 )
             else:
                 client = AsyncModbusTcpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
+                    framer=ModbusRtuFramer,
                     timeout=5,
                 )
 
