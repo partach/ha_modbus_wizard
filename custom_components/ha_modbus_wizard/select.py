@@ -50,7 +50,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 coordinator=coordinator,
                 entry=entry,
                 unique_id=uid,
-                key=reg_key(reg["name"),
+                key=reg_key(reg["name"]),
                 info=reg,
                 device_info=device_info,
             )
