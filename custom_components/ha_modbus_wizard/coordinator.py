@@ -7,7 +7,7 @@ import asyncio
 from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import CONF_REGISTERS
 
 _LOGGER = logging.getLogger(__name__)
