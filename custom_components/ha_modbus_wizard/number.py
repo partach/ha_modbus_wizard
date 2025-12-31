@@ -67,7 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entity = entities.pop(uid)
                 hass.async_create_task(entity.async_remove())
 
-        _LOGGER.info("Number sync complete — active=%d", len(entities))
+       # _LOGGER.debug("Number sync complete — active=%d", len(entities))
 
     async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await _sync_entities()
