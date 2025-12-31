@@ -218,6 +218,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         """Fetch latest data from configured registers."""
         if not await self._async_connect():
             _LOGGER.warning("Could not connect to Modbus device")
+            return {}
 
         registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
         if not registers:
