@@ -69,8 +69,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         _LOGGER.info("Number sync complete — active=%d", len(entities))
 
-    _sync_entities()
-    entry.add_update_listener(lambda *_: _sync_entities())
+    async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        await _sync_entities()
+    
+    # only happens on init:   
+    await _sync_entities()
+    
+    remove_listener = entry.add_update_listener(_handle_options_update)
+    hass.async_on_unload(remove_listener)
 
 
 class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
