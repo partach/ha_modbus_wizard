@@ -13,6 +13,7 @@ from .const import (
     CONF_BAUDRATE,
     CONF_BYTESIZE,
     CONF_CONNECTION_TYPE,
+    CONF_PROTOCOL,
     CONF_HOST,
     CONF_PARITY,
     CONF_PORT,
