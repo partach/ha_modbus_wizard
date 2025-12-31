@@ -4,6 +4,7 @@ DOMAIN = "ha_modbus_wizard"
 
 # Connection types
 CONNECTION_TYPE_SERIAL = "serial"
+CONNECTION_TYPE_IP = "ip"
 CONNECTION_TYPE_TCP = "tcp"
 CONNECTION_TYPE_UDP = "udp"
 
