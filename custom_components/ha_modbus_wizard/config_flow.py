@@ -223,7 +223,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
                     timeout=5,
                 )
-            elif data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_TCP:
+            elif data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_TCP and data[CONF_PROTOCOL] == CONNECTION_TYPE_UDP:
                 client = AsyncModbusUdpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
