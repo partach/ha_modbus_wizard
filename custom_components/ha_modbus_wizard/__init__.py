@@ -6,7 +6,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
+from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient, AsyncModbusUdpClient
 from homeassistant.exceptions import HomeAssistantError
 from datetime import timedelta
 from .const import (
@@ -22,6 +22,8 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_NAME,
     CONNECTION_TYPE_SERIAL,
+    CONNECTION_TYPE_TCP,
+    CONNECTION_TYPE_UDP,
     DEFAULT_BAUDRATE,
     DEFAULT_BYTESIZE,
     DEFAULT_PARITY,
@@ -126,8 +128,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 bytesize=config.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
                 timeout=5,
             )
+    elif: connection_type == CONNECTION_TYPE_TCP
+        key = f"tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
 
-    else:  # TCP
+        if key not in hass.data[DOMAIN]["connections"]:
+            hass.data[DOMAIN]["connections"][key] = AsyncModbusUdpClient(
+                host=config[CONF_HOST],
+                port=config[CONF_PORT],
+                timeout=5,
+            )
+    else:  # UDP
         key = f"tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
 
         if key not in hass.data[DOMAIN]["connections"]:
