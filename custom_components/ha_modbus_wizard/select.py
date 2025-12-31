@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     def _key(reg: dict[str, Any]) -> str:
         return reg["name"].lower().strip().replace(" ", "_")
 
-    def _sync_entities() -> None:
+    async def _sync_entities() -> None:
         current_regs = entry.options.get(CONF_REGISTERS, [])
         desired_ids = set()
         new_entities: list[Entity] = []
@@ -70,8 +70,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         _LOGGER.info("Select sync complete — active=%d", len(entities))
 
-    _sync_entities()
-    entry.add_update_listener(lambda *_: _sync_entities())
+    async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        await _sync_entities()
+    
+    # only happens on init:   
+    await _sync_entities()
+    
+    remove_listener = entry.add_update_listener(_handle_options_update)
+    hass.async_on_unload(remove_listener)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
