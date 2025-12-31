@@ -340,7 +340,10 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             "float32": dt.FLOAT32,
             "uint64": dt.UINT64,
             "int64": dt.INT64,
-            "string": dt.STRING,  # Added support for strings
+            "string": dt.STRING,
+            "uint": dt.UINT16,
+            "int": dt.INT16,
+            "float": dt.FLOAT32, 
         }
     
         # Case-insensitive lookup with fallback
