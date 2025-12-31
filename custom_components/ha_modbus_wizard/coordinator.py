@@ -8,7 +8,7 @@ from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from .const import CONF_REGISTERS
+from .const import CONF_REGISTERS, reg_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -230,7 +230,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         async with self._lock:
             for idx, reg in enumerate(updated_registers):
                 try:
-                    key = reg["name"].lower().replace(" ", "_")
+                    key = reg_key(reg["name"])
                     address = int(reg["address"])
                     count = int(reg.get("size", 1))
                     reg_type = reg.get("register_type", "holding")
