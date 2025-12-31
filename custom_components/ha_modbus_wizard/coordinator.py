@@ -217,11 +217,11 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         """Fetch latest data from configured registers."""
         if not await self._async_connect():
-            raise UpdateFailed("Could not connect to Modbus device")
+            _LOGGER.warning("Could not connect to Modbus device")
 
         registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
         if not registers:
-            _LOGGER.info("No registers yet defined")
+            _LOGGER.debug("No registers yet defined")
             return {}
         updated_registers = [dict(reg) for reg in registers]
         options_changed = False
@@ -276,6 +276,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                             continue
 
                     if result.isError():
+                        _LOGGER.debug("Read failed for %s: %s", reg["name"], result)
                         continue
 
                     values = (
@@ -304,18 +305,20 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             )
 
         if not new_data:
-            raise UpdateFailed("No registers could be read")
+            _LOGGER.warning("Failed updating registers")
 
         return new_data
 
     # ------------------------------------------------------------------
     # De/encoding (Using Pymodbus Mixin String-based Endianness)
     # ------------------------------------------------------------------
+   
     def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
         """Decode registers using client mixin with string-based orders."""
         if not isinstance(registers, list) or len(registers) == 0:
-            return registers
-
+            _LOGGER.debug("Nothing to decode, no result from register %s", registers)
+            return registers  # or None / [] if you prefer
+    
         dt = self.client.DATATYPE
         dt_map = {
             "uint16": dt.UINT16,
@@ -325,21 +328,31 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             "float32": dt.FLOAT32,
             "uint64": dt.UINT64,
             "int64": dt.INT64,
+            "string": dt.STRING,  # Added support for strings
         }
-        
-        target_type = dt_map.get(data_type, dt.UINT16)
-        
-        # Pymodbus 3.x mixin accepts "big" or "little" strings directly
-        decoded = self.client.convert_from_registers(
-            registers,
-            data_type=target_type,
-            byte_order=byte_order.lower(),
-            word_order=word_order.lower(),
-        )
+    
+        # Case-insensitive lookup with fallback
+        target_type = dt_map.get(data_type.lower(), dt.UINT16)
+    
+        try:
+            decoded = self.client.convert_from_registers(
+                registers=registers,
+                data_type=target_type,
+                byte_order=byte_order.lower(),
+                word_order=word_order.lower(),
+            )
+    
+            # Post-processing
+            if target_type == dt.FLOAT32 and isinstance(decoded, (int, float)):
+                return round(decoded, 6)
+            if target_type == dt.STRING and isinstance(decoded, str):
+                return decoded.rstrip("\x00")  # Clean null padding
+    
+            return decoded
 
-        if data_type == "float32" and isinstance(decoded, (int, float)):
-            return round(decoded, 6)
-        return decoded
+    except Exception as err:
+        _LOGGER.warning("Failed to decode %s as %s: %s", registers, data_type, err)
+        return None  # or registers for raw fallback
 
     def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
         """Encode value to registers using client mixin with string-based orders."""
