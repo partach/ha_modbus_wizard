@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
 from .options_flow import ModbusWizardOptionsFlow
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient, AsyncModbusUdpClient
-from pymodbus.framer.rtu_framer import ModbusRtuFramer
+from pymodbus.framer import FramerType.RTU
 from pymodbus.exceptions import ModbusException
 
 from .const import (
@@ -229,14 +229,14 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 client = AsyncModbusUdpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
-                    framer=ModbusRtuFramer, # future extensions, give options for framer
+                    framer=FramerType.RTU, # future extensions, give options for framer
                     timeout=5,
                 )
             else:
                 client = AsyncModbusTcpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
-                    framer=ModbusRtuFramer,
+                    framer=FramerType.RTU,
                     timeout=5,
                 )
 
