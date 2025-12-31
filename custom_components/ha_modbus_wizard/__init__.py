@@ -129,7 +129,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 bytesize=config.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
                 timeout=5,
             )
-    elif: connection_type == CONNECTION_TYPE_IP and protocol == CONNECTION_TYPE_UDP
+    elif connection_type == CONNECTION_TYPE_IP and protocol == CONNECTION_TYPE_UDP:
         key = f"tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
 
         if key not in hass.data[DOMAIN]["connections"]:
