@@ -240,12 +240,16 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
                     # -------- AUTO DETECT --------
                     if reg_type == "auto":
-                        for name, method in (
+                        methods = [
                             ("holding", self.client.read_holding_registers),
                             ("input", self.client.read_input_registers),
-                            ("coil", self.client.read_coils),
-                            ("discrete", self.client.read_discrete_inputs),
-                        ):
+                        ]
+                        if reg.get("allow_bits"):
+                            methods += [
+                                ("coil", self.client.read_coils),
+                                ("discrete", self.client.read_discrete_inputs),
+                            ]
+                        for name, method in methods:
                             try:
                                 result = await method(
                                     address=address,
@@ -253,6 +257,10 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                                     device_id=self.slave_id,
                                 )
                                 if not result.isError():
+                                    if name in ("holding", "input") and not hasattr(result, "registers"):
+                                        continue
+                                    if name in ("coil", "discrete") and not hasattr(result, "bits"):
+                                        continue                              
                                     reg_type = name
                                     updated_registers[idx]["register_type"] = name
                                     options_changed = True
@@ -261,6 +269,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                                 continue
 
                         if reg_type == "auto":
+                            _LOGGER.warning("Auto-detect failed for register '%s' at address %s", reg["name"],address,)
                             continue
 
                     # -------- DIRECT READ --------
@@ -295,19 +304,20 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                         reg.get("byte_order", "big"),
                         reg.get("word_order", "big"),
                     )
+                    _LOGGER.debug("Register %s (%s) → %s", reg["name"], key, new_data[key])
 
                 except Exception as err:
                     _LOGGER.warning("Error updating register '%s': %s", reg.get("name"), err)
 
         if options_changed:
-            _LOGGER.warning("options changed, logic to update not yet in place")
+            _LOGGER.warning("Detected register types updated; will take effect after options reload")
               # self.hass.config_entries.async_update_entry(
                  # self.my_config_entry,
                # options={**self.my_config_entry.options, CONF_REGISTERS: updated_registers},
             # )
 
         if not new_data:
-            _LOGGER.warning("Now new data retrieved")
+            _LOGGER.debug("No register values produced in this update cycle")
 
         return new_data
 
