@@ -38,7 +38,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         """Key used in coordinator.data."""
         return reg["name"].lower().strip().replace(" ", "_")
 
-    def _sync_entities() -> None:
+    async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
+        await _sync_entities()
+    
+    async def _sync_entities() -> None:
         """Create, update and remove entities based on options."""
         current_regs = entry.options.get(CONF_REGISTERS, [])
         desired_ids = set()
@@ -86,10 +89,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         )
 
     # Initial sync
-    _sync_entities()
+    await _sync_entities()
 
     # Re-sync on options change
-    entry.add_update_listener(lambda *_: _sync_entities())
+    remove_listener = entry.add_update_listener(_handle_options_update)
+    hass.async_on_unload(remove_listener)
 
 
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
