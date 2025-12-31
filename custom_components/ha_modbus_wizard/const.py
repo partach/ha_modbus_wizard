@@ -5,6 +5,7 @@ DOMAIN = "ha_modbus_wizard"
 # Connection types
 CONNECTION_TYPE_SERIAL = "serial"
 CONNECTION_TYPE_TCP = "tcp"
+CONNECTION_TYPE_UDP = "udp"
 
 # Common settings
 CONF_SLAVE_ID = "slave_id"
@@ -23,6 +24,7 @@ CONF_REGISTERS = "registers"
 # TCP settings
 CONF_HOST = "host"
 CONF_PORT = "port"
+CONF_PROTOCOL = "protocol"
 
 # Defaults
 DEFAULT_SLAVE_ID = 1
