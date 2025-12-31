@@ -93,7 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # Re-sync on options change
     remove_listener = entry.add_update_listener(_handle_options_update)
-    hass.async_on_unload(remove_listener)
+    entry.async_on_unload(remove_listener)
 
 
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
