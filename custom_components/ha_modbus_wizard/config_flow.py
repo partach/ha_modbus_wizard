@@ -16,6 +16,7 @@ from pymodbus.exceptions import ModbusException
 
 from .const import (
     CONNECTION_TYPE_SERIAL,
+    CONNECTION_TYPE_IP,
     CONNECTION_TYPE_TCP,
     CONNECTION_TYPE_UDP,
     CONF_CONNECTION_TYPE,
@@ -74,7 +75,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.SelectSelectorConfig(
                             options=[
                                 selector.SelectOptionDict(value=CONNECTION_TYPE_SERIAL, label="Serial (RS485/RTU)"),
-                                selector.SelectOptionDict(value=CONNECTION_TYPE_TCP, label="TCP/IP (Modbus TCP)"),
+                                selector.SelectOptionDict(value=CONNECTION_TYPE_IP, label="IP (Modbus TCP/UDP)"),
                             ],
                             mode=selector.SelectSelectorMode.DROPDOWN,
                         )
@@ -195,7 +196,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
                         vol.Coerce(int), vol.Range(min=1, max=65535)
                     ),
-                    vol.Required(CONF_PROTOCOL, default=CONNECTION_TYPE_TCP): selector.SelectSelector(
+                    vol.Required(CONF_PROTOCOL, default=CONNECTION_TYPE_IP): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=[
                                 selector.SelectOptionDict(value=CONNECTION_TYPE_TCP, label="TCP"),
@@ -223,7 +224,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
                     timeout=5,
                 )
-            elif data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_TCP and data[CONF_PROTOCOL] == CONNECTION_TYPE_UDP:
+            elif data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_IP and data[CONF_PROTOCOL] == CONNECTION_TYPE_UDP:
                 client = AsyncModbusUdpClient(
                     host=data[CONF_HOST],
                     port=data[CONF_PORT],
