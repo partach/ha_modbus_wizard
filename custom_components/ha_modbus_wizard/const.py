@@ -32,3 +32,6 @@ DEFAULT_STOPBITS = 1
 DEFAULT_BYTESIZE = 8
 DEFAULT_PARITY = "N"
 DEFAULT_UPDATE_INTERVAL = 10
+
+def reg_key(name: str) -> str:
+    return name.lower().strip().replace(" ", "_")
