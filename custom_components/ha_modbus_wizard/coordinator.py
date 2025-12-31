@@ -349,10 +349,10 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 return decoded.rstrip("\x00")  # Clean null padding
     
             return decoded
-
-    except Exception as err:
-        _LOGGER.warning("Failed to decode %s as %s: %s", registers, data_type, err)
-        return None  # or registers for raw fallback
+    
+        except Exception as err:
+            _LOGGER.warning("Failed to decode %s as %s: %s", registers, data_type, err)
+            return None  # or registers for raw fallback
 
     def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
         """Encode value to registers using client mixin with string-based orders."""
