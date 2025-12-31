@@ -77,7 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     await _sync_entities()
     
     remove_listener = entry.add_update_listener(_handle_options_update)
-    hass.async_on_unload(remove_listener)
+    entry.async_on_unload(remove_listener)
 
 
 class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
