@@ -11,13 +11,15 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
 from .options_flow import ModbusWizardOptionsFlow
-from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient
+from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient, AsyncModbusUdpClient
 from pymodbus.exceptions import ModbusException
 
 from .const import (
     CONNECTION_TYPE_SERIAL,
     CONNECTION_TYPE_TCP,
+    CONNECTION_TYPE_UDP,
     CONF_CONNECTION_TYPE,
+    CONF_PROTOCOL,
     CONF_HOST,
     CONF_PORT,
     CONF_SERIAL_PORT,
@@ -173,6 +175,7 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     **self._data,
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
+                    CONF_PROTOCOL: user_input[CONF_PROTOCOL],
                 }
 
                 await self._async_test_connection(final_data)
@@ -192,6 +195,16 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PORT, default=DEFAULT_TCP_PORT): vol.All(
                         vol.Coerce(int), vol.Range(min=1, max=65535)
                     ),
+                    vol.Required(CONF_PROTOCOL, default=CONNECTION_TYPE_TCP): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                selector.SelectOptionDict(value=CONNECTION_TYPE_TCP, label="TCP"),
+                                selector.SelectOptionDict(value=CONNECTION_TYPE_UDP, label="UDP"),
+                            ],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+
                 }
             ),
             errors=errors,
@@ -208,6 +221,12 @@ class ModbusWizardConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     parity=data.get(CONF_PARITY, DEFAULT_PARITY),
                     stopbits=data.get(CONF_STOPBITS, DEFAULT_STOPBITS),
                     bytesize=data.get(CONF_BYTESIZE, DEFAULT_BYTESIZE),
+                    timeout=5,
+                )
+            elif data[CONF_CONNECTION_TYPE] == CONNECTION_TYPE_TCP:
+                client = AsyncModbusUdpClient(
+                    host=data[CONF_HOST],
+                    port=data[CONF_PORT],
                     timeout=5,
                 )
             else:
