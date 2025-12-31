@@ -130,85 +130,85 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             }
             size = type_sizes.get(data_type.lower(), 1)
 
-        async with self._lock:
-            result = None
 
-            # === AUTO DETECTION ===
-            if not register_type or register_type == "auto":
-                methods = [
-                    ("holding", self.client.read_holding_registers),
-                    ("input", self.client.read_input_registers),
-                    ("coil", self.client.read_coils),
-                    ("discrete", self.client.read_discrete_inputs),
-                ]
+        result = None
 
-                for name, method in methods:
-                    try:
-                        result = await method(
-                            address=address,
-                            count=size,
-                            device_id=self.slave_id,
-                        )
-                        if not result.isError():
-                            register_type = name  # Detected type
-                            break
-                    except Exception as inner_err:
-                        _LOGGER.debug("Auto test failed for %s at addr %d: %s", name, address, inner_err)
-                        result = None
+        # === AUTO DETECTION ===
+        if not register_type or register_type == "auto":
+            methods = [
+                ("holding", self.client.read_holding_registers),
+                ("input", self.client.read_input_registers),
+                ("coil", self.client.read_coils),
+                ("discrete", self.client.read_discrete_inputs),
+            ]
 
-                if result is None or result.isError():
-                    _LOGGER.warning("Auto-detect failed for address %d (size %d)", address, size)
-                    return None
-
-            # === DIRECT READ ===
-            else:
-                method_map = {
-                    "holding": self.client.read_holding_registers,
-                    "input": self.client.read_input_registers,
-                    "coil": self.client.read_coils,
-                    "discrete": self.client.read_discrete_inputs,
-                }
-                method = method_map.get(register_type.lower())
-                if method is None:
-                    _LOGGER.error("Invalid register_type: %s", register_type)
-                    return None
-
+            for name, method in methods:
                 try:
                     result = await method(
                         address=address,
                         count=size,
                         device_id=self.slave_id,
                     )
-                except Exception as err:
-                    _LOGGER.error("Read failed for %s register at %d: %s", register_type, address, err)
-                    return None
+                    if not result.isError():
+                        register_type = name  # Detected type
+                        break
+                except Exception as inner_err:
+                    _LOGGER.debug("Auto test failed for %s at addr %d: %s", name, address, inner_err)
+                    result = None
 
-                if result.isError():
-                    return None
-
-            # === RAW MODE ===
-            if raw:
-                return {
-                    "registers": getattr(result, "registers", []), # default data word, not part of options
-                    "bits": getattr(result, "bits", [])[:size],
-                    "detected_type": register_type,
-                }
-
-            # === DECODE VALUES ===
-            if register_type in ("coil", "discrete"):
-                values = result.bits[:size]
-            else:
-                values = result.registers[:size]
-
-            if not values:
+            if result is None or result.isError():
+                _LOGGER.warning("Auto-detect failed for address %d (size %d)", address, size)
                 return None
 
-            return self._decode_value(
-                values,
-                data_type,
-                byte_order,
-                word_order,
-            )
+        # === DIRECT READ ===
+        else:
+            method_map = {
+                "holding": self.client.read_holding_registers,
+                "input": self.client.read_input_registers,
+                "coil": self.client.read_coils,
+                "discrete": self.client.read_discrete_inputs,
+            }
+            method = method_map.get(register_type.lower())
+            if method is None:
+                _LOGGER.error("Invalid register_type: %s", register_type)
+                return None
+
+            try:
+                result = await method(
+                    address=address,
+                    count=size,
+                    device_id=self.slave_id,
+                )
+            except Exception as err:
+                _LOGGER.error("Read failed for %s register at %d: %s", register_type, address, err)
+                return None
+
+            if result.isError():
+                return None
+
+        # === RAW MODE ===
+        if raw:
+            return {
+                "registers": getattr(result, "registers", []), # default data word, not part of options
+                "bits": getattr(result, "bits", [])[:size],
+                "detected_type": register_type,
+            }
+
+        # === DECODE VALUES ===
+        if register_type in ("coil", "discrete"):
+            values = result.bits[:size]
+        else:
+            values = result.registers[:size]
+
+        if not values:
+            return None
+
+        return self._decode_value(
+            values,
+            data_type,
+            byte_order,
+            word_order,
+        )
 
     # ------------------------------------------------------------------
     # Polling
@@ -299,13 +299,14 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     _LOGGER.warning("Error updating register '%s': %s", reg.get("name"), err)
 
         if options_changed:
-            self.hass.config_entries.async_update_entry(
-                self.my_config_entry,
-                options={**self.my_config_entry.options, CONF_REGISTERS: updated_registers},
-            )
+            _LOGGER.warning("options changed, logic to update not yet in place")
+              # self.hass.config_entries.async_update_entry(
+                 # self.my_config_entry,
+               # options={**self.my_config_entry.options, CONF_REGISTERS: updated_registers},
+            # )
 
         if not new_data:
-            _LOGGER.warning("Failed updating registers")
+            _LOGGER.warning("Now new data retrieved")
 
         return new_data
 
