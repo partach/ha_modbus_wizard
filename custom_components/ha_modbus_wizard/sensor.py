@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.components.sensor import SensorEntity
 
-from .const import DOMAIN, CONF_REGISTERS
+from .const import DOMAIN, CONF_REGISTERS, reg_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,10 +33,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     def _entity_unique_id(reg: dict[str, Any]) -> str:
         """Stable unique_id independent of display name changes."""
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}"
-
-    def _entity_key(reg: dict[str, Any]) -> str:
-        """Key used in coordinator.data."""
-        return reg["name"].lower().strip().replace(" ", "_")
 
     async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await _sync_entities()
@@ -63,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 coordinator=coordinator,
                 entry=entry,
                 unique_id=unique_id,
-                key=_entity_key(reg),
+                key=reg_key(reg["name"),
                 info=reg,
                 device_info=device_info,
             )
