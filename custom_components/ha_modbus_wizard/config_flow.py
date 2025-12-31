@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
 from .options_flow import ModbusWizardOptionsFlow
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient, AsyncModbusUdpClient
+from pymodbus.framer.rtu_framer import ModbusRtuFramer
 from pymodbus.exceptions import ModbusException
 
 from .const import (
