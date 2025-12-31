@@ -140,7 +140,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional("word_order", default="big"): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=["big", "little"])
                 ),
-
+                vol.Optional("allow_bits", default=False): bool,
                 # NumberEntity bounds
                 vol.Optional("min"): vol.Coerce(float),
                 vol.Optional("max"): vol.Coerce(float),
