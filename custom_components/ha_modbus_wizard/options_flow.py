@@ -131,7 +131,8 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 ),
 
                 vol.Optional("unit"): str,
-
+                vol.Optional("scale", default=1.0): vol.Coerce(float),
+                vol.Optional("offset", default=0.0): vol.Coerce(float),
                 vol.Optional("options"): str,  # JSON mapping for SelectEntity
 
                 vol.Optional("byte_order", default="big"): selector.SelectSelector(
