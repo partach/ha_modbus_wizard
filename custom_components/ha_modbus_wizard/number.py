@@ -111,6 +111,12 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
         return self.coordinator.data.get(self._key)
 
     async def async_set_native_value(self, value: float) -> None:
+        if self._info.get("rw") not in ("write", "rw"):
+        _LOGGER.warning(
+            "Blocked write to read-only register %s",
+            self._info.get("name"),
+        )
+        return
         await self.coordinator.async_write_registers(
             address=int(self._info["address"]),
             value=value,
