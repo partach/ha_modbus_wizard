@@ -419,7 +419,11 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             offset = reg.get("offset", 0.0)
             if scale != 0 and isinstance(value, (int, float)):
                 value = (value - offset) / scale
-    
+        if target_type != ModbusClientMixin.DATATYPE.FLOAT32:
+            if isinstance(value, float):
+                value = int(round(value))
+        else:
+            value = float(value)    
         try:
             return self.client.convert_to_registers(
                 value=value,
