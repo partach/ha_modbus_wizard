@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.components.select import SelectEntity
-
+from homeassistant.helpers import entity_registry as er
 from .const import DOMAIN, CONF_REGISTERS, reg_key
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,8 +62,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         for uid in list(entities):
             if uid not in desired_ids:
+                ent_reg = er.async_get(hass)
                 entity = entities.pop(uid)
-                hass.async_create_task(entity.async_remove())
+                if entity.entity_id:
+                    ent_reg.async_remove(entity.entity_id)
+                    _LOGGER.debug("Removed entity registry entry %s", entity.entity_id)
+                await entity.async_remove()
 
        # _LOGGER.debug("Select sync complete — active=%d", len(entities))
 
