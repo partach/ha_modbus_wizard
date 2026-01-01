@@ -98,8 +98,14 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 user_input["size"] = type_sizes[dtype]
 
             if not errors:
+                _LOGGER.debug("Adding register: %s", user_input)
                 self._registers.append(user_input)
                 self._save()
+                _LOGGER.info(
+                    "Total registers after save: %d, config_entry options: %s",
+                    len(self._registers),
+                    self.config_entry.options.get(CONF_REGISTERS),
+                )
                 return await self.async_step_init()
 
         return self.async_show_form(
