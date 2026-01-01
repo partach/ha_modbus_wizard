@@ -117,7 +117,15 @@ class ModbusWizardSelect(CoordinatorEntity, SelectEntity):
         value = self._reverse_map.get(option)
         if value is None:
             return
-
+        if self._info.get("rw") not in ("write", "rw"):
+            _LOGGER.warning(
+                "Blocked write to read-only register %s",
+                self._info.get("name"),
+            )
+            return
+        dt = self._info.get("data_type", "uint16").lower()
+        if not dt.startswith("float"):
+            value = int(round(value))
         await self.coordinator.async_write_registers(
             address=int(self._info["address"]),
             value=int(value),
