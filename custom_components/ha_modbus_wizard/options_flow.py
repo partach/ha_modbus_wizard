@@ -13,7 +13,7 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_REGISTERS,
 )
-
+_LOGGER = logging.getLogger(__name__)
 
 class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Modbus Wizard."""
