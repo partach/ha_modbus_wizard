@@ -120,6 +120,11 @@ class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = info.get("unit")
         self._attr_device_class = info.get("device_class")
         self._attr_device_info = device_info
+        # Add display precision - default to 2 decimal places for floats
+        if info.get("data_type") == "float32":
+            self._attr_suggested_display_precision = info.get("precision", 2)
+        elif info.get("data_type") in ("uint16", "int16", "uint32", "int32"):
+            self._attr_suggested_display_precision = 0  # No decimals for integers
 
     @property
     def native_value(self):
