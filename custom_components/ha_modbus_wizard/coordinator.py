@@ -289,6 +289,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     if result.isError():
                         _LOGGER.debug("Read failed for %s: %s", reg["name"], result)
                         continue
+                    else:
+                        _LOGGER.debug("Read success for %s: %s", reg["name"], result)
 
                     values = (
                         result.bits[:count]
