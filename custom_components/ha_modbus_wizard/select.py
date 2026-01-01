@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     async def _sync_entities() -> None:
         current_regs = entry.options.get(CONF_REGISTERS, [])
-        desired_ids = set[str]=set()
+        desired_ids = set()
         new_entities: list[Entity] = []
 
         for reg in current_regs:
