@@ -212,3 +212,6 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             self.config_entry,
             options={**self.config_entry.options, CONF_REGISTERS: self._registers},
         )
+        self.hass.async_create_task(
+            self.hass.config_entries.async_reload(self.config_entry.entry_id)
+        )
