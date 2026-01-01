@@ -105,6 +105,11 @@ class ModbusWizardNumber(CoordinatorEntity, NumberEntity):
         self._attr_min_value = info.get("min")
         self._attr_max_value = info.get("max")
         self._attr_step = info.get("step", 1)
+        # Add display precision - default to 2 decimal places for floats
+        if info.get("data_type") == "float32":
+            self._attr_suggested_display_precision = info.get("precision", 2)
+        elif info.get("data_type") in ("uint16", "int16", "uint32", "int32"):
+            self._attr_suggested_display_precision = 0  # No decimals for integers
 
     @property
     def native_value(self):
