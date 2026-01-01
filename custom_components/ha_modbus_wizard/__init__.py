@@ -105,8 +105,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN].setdefault("coordinators", {})
 
     config = entry.data
-    connection_type = config[CONF_CONNECTION_TYPE]
-    protocol = config[CONF_PROTOCOL]
+    connection_type = config.get(CONF_CONNECTION_TYPE, CONNECTION_TYPE_SERIAL)
+    protocol = config.get(CONF_PROTOCOL, CONNECTION_TYPE_TCP)
 
     # ----------------------------------------------------------------
     # Get or create shared Modbus connection
