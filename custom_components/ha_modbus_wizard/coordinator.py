@@ -9,6 +9,7 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import CONF_REGISTERS, reg_key
+from pymodbus.client.mixin import ModbusClientMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                             ("holding", self.client.read_holding_registers),
                             ("input", self.client.read_input_registers),
                         ]
-                        if reg.get("allow_bits"):
+                        if reg.get("allow_bits", False):
                             methods += [
                                 ("coil", self.client.read_coils),
                                 ("discrete", self.client.read_discrete_inputs),
@@ -326,74 +327,99 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # De/encoding (Using Pymodbus Mixin String-based Endianness)
     # ------------------------------------------------------------------
    
-    def _decode_value(self, registers, data_type, byte_order="big", word_order="big",reg: dict | None = None):
-        """Decode registers using client mixin with string-based orders."""
-        if not isinstance(registers, list) or len(registers) == 0:
-            _LOGGER.debug("Nothing to decode, no result from register %s", registers)
-            return registers  # or None / [] if you prefer
+
+
+    def _decode_value(
+        self,
+        values: list[int] | list[bool],
+        data_type: str,
+        byte_order: str = "big",
+        word_order: str = "big",
+        reg: dict | None = None,
+    ) -> Any | None:
+        """Decode registers or bits using the modern client mixin."""
+        if not values:
+            return None
     
-        dt = self.client.DATATYPE
+        dt = data_type.lower()
+    
+        # Map data_type to DATATYPE enum
         dt_map = {
-            "uint16": dt.UINT16,
-            "int16": dt.INT16,
-            "uint32": dt.UINT32,
-            "int32": dt.INT32,
-            "float32": dt.FLOAT32,
-            "uint64": dt.UINT64,
-            "int64": dt.INT64,
-            "string": dt.STRING,
-            "uint": dt.UINT16,
-            "int": dt.INT16,
-            "float": dt.FLOAT32, 
+            "uint16": ModbusClientMixin.DATATYPE.UINT16,
+            "int16": ModbusClientMixin.DATATYPE.INT16,
+            "uint32": ModbusClientMixin.DATATYPE.UINT32,
+            "int32": ModbusClientMixin.DATATYPE.INT32,
+            "float32": ModbusClientMixin.DATATYPE.FLOAT32,
+            "uint64": ModbusClientMixin.DATATYPE.UINT64,
+            "int64": ModbusClientMixin.DATATYPE.INT64,
+            "string": ModbusClientMixin.DATATYPE.STRING,
         }
+        target_type = dt_map.get(dt, ModbusClientMixin.DATATYPE.UINT16)
     
-        # Case-insensitive lookup with fallback
-        target_type = dt_map.get(data_type.lower(), dt.UINT16)
+        # Special handling for bit-based registers (coil/discrete)
+        if isinstance(values[0], bool):
+            if len(values) == 1:
+                decoded = bool(values[0])
+            else:
+                # Multi-bit → pack into integer (big-endian bit order)
+                decoded = int("".join("1" if b else "0" for b in values[::-1]), 2)
+        else:
+            # Normal register decoding
+            try:
+                decoded = self.client.convert_from_registers(
+                    registers=values,
+                    data_type=target_type,
+                    byte_order=byte_order.lower(),
+                    word_order=word_order.lower(),
+                )
+            except Exception as err:
+                _LOGGER.warning("Failed to decode %s as %s: %s", values, data_type, err)
+                return None
     
-        try:
-            decoded = self.client.convert_from_registers(
-                registers=registers,
-                data_type=target_type,
-                byte_order=byte_order.lower(),
-                word_order=word_order.lower(),
-            )
+        # Post-processing
+        if target_type == ModbusClientMixin.DATATYPE.FLOAT32 and isinstance(decoded, float):
+            decoded = round(decoded, 6)
+        if target_type == ModbusClientMixin.DATATYPE.STRING and isinstance(decoded, str):
+            decoded = decoded.rstrip("\x00")
     
-            # Post-processing
-            if target_type == dt.FLOAT32 and isinstance(decoded, (int, float)):
-                return round(decoded, 6)
-            if target_type == dt.STRING and isinstance(decoded, str):
-                return decoded.rstrip("\x00")  # Clean null padding
-            if reg is not None:  # reg is the register dict from config
-                scale = reg.get("scale", 1.0)
-                offset = reg.get("offset", 0.0)
-                decoded_value = decoded_value * scale + offset  
-            return decoded
+        # Apply scale and offset (after decoding)
+        if reg is not None:
+            scale = reg.get("scale", 1.0)
+            offset = reg.get("offset", 0.0)
+            if isinstance(decoded, (int, float)):
+                decoded = decoded * scale + offset
     
-        except Exception as err:
-            _LOGGER.warning("Failed to decode %s as %s: %s", registers, data_type, err)
-            return None  # or registers for raw fallback
-
-    def _encode_value(self, value, data_type, byte_order="big", word_order="big", reg: dict | None = None):
-        """Encode value to registers using client mixin.
-        Applies reverse scale/offset if reg dict is provided."""
-        dt = self.client.DATATYPE
+        return decoded
+    
+    
+    def _encode_value(
+        self,
+        value,
+        data_type: str,
+        byte_order: str = "big",
+        word_order: str = "big",
+        reg: dict | None = None,
+    ) -> list[int]:
+        """Encode value to registers using the modern client mixin."""
+        dt = data_type.lower()
         dt_map = {
-            "uint16": dt.UINT16, "int16": dt.INT16,
-            "uint32": dt.UINT32, "int32": dt.INT32,
-            "float32": dt.FLOAT32,
-            "uint64": dt.UINT64, "int64": dt.INT64,
-            # Note: string encoding not supported via convert_to_registers
+            "uint16": ModbusClientMixin.DATATYPE.UINT16,
+            "int16": ModbusClientMixin.DATATYPE.INT16,
+            "uint32": ModbusClientMixin.DATATYPE.UINT32,
+            "int32": ModbusClientMixin.DATATYPE.INT32,
+            "float32": ModbusClientMixin.DATATYPE.FLOAT32,
+            "uint64": ModbusClientMixin.DATATYPE.UINT64,
+            "int64": ModbusClientMixin.DATATYPE.INT64,
         }
-
-        target_type = dt_map.get(data_type.lower(), dt.UINT16)
-
-        # Reverse-apply scale and offset before encoding (if provided)
+        target_type = dt_map.get(dt, ModbusClientMixin.DATATYPE.UINT16)
+    
+        # Reverse scale/offset before encoding
         if reg is not None:
             scale = reg.get("scale", 1.0)
             offset = reg.get("offset", 0.0)
             if scale != 0 and isinstance(value, (int, float)):
-                value = (value - offset) / scale  # reverse: (displayed - offset) / scale
-
+                value = (value - offset) / scale
+    
         try:
             return self.client.convert_to_registers(
                 value=value,
@@ -403,8 +429,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             )
         except Exception as err:
             _LOGGER.error(
-                "Failed to encode value %s as %s (byte=%s, word=%s): %s",
-                value, data_type, byte_order, word_order, err
+                "Failed to encode %s as %s (byte=%s, word=%s): %s",
+                value, data_type, byte_order, word_order, err,
             )
-            raise  # Let caller handle write failure
+            raise
 
