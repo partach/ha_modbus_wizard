@@ -164,7 +164,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = ModbusWizardCoordinator(
         hass=hass,
         client=client,
-        slave_id=config[CONF_SLAVE_ID],
+        slave_id=int(config[CONF_SLAVE_ID]),
         config_entry=entry,
         update_interval=timedelta(seconds=update_interval),
     )
