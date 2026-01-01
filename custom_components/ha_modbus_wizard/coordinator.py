@@ -231,16 +231,17 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
         async with self._lock:
             for idx, reg in enumerate(updated_registers):
-                try:
-                    key = reg_key(reg["name"])
-                    address = int(float(reg["address"])) # double casting to make sure we dont get strange address
-                    count = int(float(reg.get("size", 1)))
-                    reg_type = reg.get("register_type", "holding")
+                key = reg_key(reg["name"])
+                address = int(reg["address"])
+                count = int(reg.get("size", 1))
+                reg_type = reg.get("register_type", "holding")
 
-                    result = None
+                result = None
+                try:
 
                     # -------- AUTO DETECT --------
                     if reg_type == "auto":
+                        _LOGGER.debug("Auto-detect path for register '%s' at address %s", reg["name"],address,)
                         methods = [
                             ("holding", self.client.read_holding_registers),
                             ("input", self.client.read_input_registers),
@@ -289,8 +290,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     if result.isError():
                         _LOGGER.debug("Read failed for %s: %s", reg["name"], result)
                         continue
-                    else:
-                        _LOGGER.debug("Read success for %s: %s", reg["name"], result)
 
                     values = (
                         result.bits[:count]
