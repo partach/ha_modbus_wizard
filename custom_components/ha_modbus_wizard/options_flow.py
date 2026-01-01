@@ -135,22 +135,21 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-
                 vol.Optional("unit"): str,
-                vol.Optional("scale", default=1.0): vol.Coerce(float),
-                vol.Optional("offset", default=0.0): vol.Coerce(float),
-                vol.Optional("options"): str, # JSON mapping for SelectEntity
-                vol.Optional("byte_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
-                ),
-                vol.Optional("word_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
-                ),
-                vol.Optional("allow_bits", default=False): bool,
-                # NumberEntity bounds
-                vol.Optional("min"): vol.Coerce(float),
-                vol.Optional("max"): vol.Coerce(float),
-                vol.Optional("step", default=1): vol.Coerce(float),
+                vol.Optional("scale", default=1.0): vol.Coerce(float),
+                vol.Optional("offset", default=0.0): vol.Coerce(float),
+                vol.Optional("options"): str, # JSON mapping for SelectEntity
+                vol.Optional("byte_order", default="big"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=["big", "little"])
+                ),
+                vol.Optional("word_order", default="big"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=["big", "little"])
+                ),
+                vol.Optional("allow_bits", default=False): bool,
+                # NumberEntity bounds
+                vol.Optional("min"): vol.Coerce(float),
+                vol.Optional("max"): vol.Coerce(float),
+                vol.Optional("step", default=1): vol.Coerce(float),
             }),
             errors=errors,
         )
