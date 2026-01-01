@@ -191,6 +191,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             self.config_entry,
             options={**self.config_entry.options, CONF_REGISTERS: self._registers},
         )
-        self.hass.async_create_task(
-            self.hass.config_entries.async_reload(self.config_entry.entry_id)
-        )
+        # this is not needed in entities this is already taken care off!
+      ##  self.hass.async_create_task(
+      ##      self.hass.config_entries.async_reload(self.config_entry.entry_id)
+      ##  )
