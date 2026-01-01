@@ -233,8 +233,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             for idx, reg in enumerate(updated_registers):
                 try:
                     key = reg_key(reg["name"])
-                    address = int(reg["address"])
-                    count = int(reg.get("size", 1))
+                    address = int(float(reg["address"])) # double casting to make sure we dont get strange address
+                    count = int(float(reg.get("size", 1)))
                     reg_type = reg.get("register_type", "holding")
 
                     result = None
