@@ -1,6 +1,6 @@
 """Options flow for Modbus Wizard – validated & aligned with runtime."""
 from __future__ import annotations
-
+import logging
 import json
 from datetime import timedelta
 import voluptuous as vol
