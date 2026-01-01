@@ -45,6 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         # ---- ADD / KEEP ----
         new_entities: list[Entity] = []
+        ent_reg = er.async_get(hass)
         for reg in current_regs:
             if reg.get("rw", "read") not in ("read", "rw"):
                 continue
@@ -75,7 +76,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         # ---- REMOVE ----
         for uid in list(entities):
             if uid not in desired_ids:
-                ent_reg = er.async_get(hass)
                 entity = entities.pop(uid)
                 if entity.entity_id:
                     ent_reg.async_remove(entity.entity_id)
