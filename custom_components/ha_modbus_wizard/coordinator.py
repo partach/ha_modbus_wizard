@@ -220,28 +220,33 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         if not await self._async_connect():
             _LOGGER.warning("Could not connect to Modbus device")
             return {}
-
+    
         registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
         if not registers:
             _LOGGER.debug("No registers yet defined")
             return {}
+        
         updated_registers = [dict(reg) for reg in registers]
         options_changed = False
         new_data = {}
-
+    
         async with self._lock:
             for idx, reg in enumerate(updated_registers):
                 key = reg_key(reg["name"])
                 address = int(reg["address"])
                 count = int(reg.get("size", 1))
                 reg_type = reg.get("register_type", "holding")
-
+    
+                _LOGGER.debug(
+                    "Processing register '%s': address=%s, type=%s, count=%s, data_type=%s",
+                    reg["name"], address, reg_type, count, reg.get("data_type", "uint16")
+                )
+    
                 result = None
                 try:
-
                     # -------- AUTO DETECT --------
                     if reg_type == "auto":
-                        _LOGGER.debug("Auto-detect path for register '%s' at address %s", reg["name"],address,)
+                        _LOGGER.debug("Auto-detect path for register '%s' at address %s", reg["name"], address)
                         methods = [
                             ("holding", self.client.read_holding_registers),
                             ("input", self.client.read_input_registers),
@@ -269,13 +274,14 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                                     break
                             except Exception:
                                 continue
-
+    
                         if reg_type == "auto":
-                            _LOGGER.warning("Auto-detect failed for register '%s' at address %s", reg["name"],address,)
+                            _LOGGER.warning("Auto-detect failed for register '%s' at address %s", reg["name"], address)
                             continue
-
+    
                     # -------- DIRECT READ --------
                     if result is None:
+                        _LOGGER.debug("Direct read for register '%s' as type '%s'", reg["name"], reg_type)
                         if reg_type == "holding":
                             result = await self.client.read_holding_registers(address=address, count=count, device_id=self.slave_id)
                         elif reg_type == "input":
@@ -285,43 +291,51 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                         elif reg_type == "discrete":
                             result = await self.client.read_discrete_inputs(address=address, count=count, device_id=self.slave_id)
                         else:
+                            _LOGGER.error("Unknown register_type '%s' for register '%s'", reg_type, reg["name"])
                             continue
-
+    
                     if result.isError():
-                        _LOGGER.debug("Read failed for %s: %s", reg["name"], result)
+                        _LOGGER.warning("Read failed for '%s' (type=%s, addr=%s): %s", reg["name"], reg_type, address, result)
                         continue
-
-                    values = (
-                        result.bits[:count]
-                        if reg_type in ("coil", "discrete")
-                        else result.registers[:count]
-                    )
-
+    
+                    # Extract values based on type
+                    if reg_type in ("coil", "discrete"):
+                        values = result.bits[:count]
+                        _LOGGER.debug("Read bits for '%s': %s", reg["name"], values)
+                    else:
+                        values = result.registers[:count]
+                        _LOGGER.debug("Read registers for '%s': %s", reg["name"], values)
+    
                     if not values:
+                        _LOGGER.warning("No values returned for register '%s'", reg["name"])
                         continue
-
-                    new_data[key] = self._decode_value(
+    
+                    # Decode the values
+                    decoded = self._decode_value(
                         values,
                         reg.get("data_type", "uint16"),
                         reg.get("byte_order", "big"),
                         reg.get("word_order", "big"),
                         reg=reg,
                     )
-                    _LOGGER.debug("Register %s (%s) → %s", reg["name"], key, new_data[key])
-
+                    
+                    if decoded is not None:
+                        new_data[key] = decoded
+                        _LOGGER.debug("Register '%s' (%s) → %s (type: %s)", reg["name"], key, decoded, type(decoded).__name__)
+                    else:
+                        _LOGGER.warning("Decode returned None for register '%s'", reg["name"])
+    
                 except Exception as err:
-                    _LOGGER.warning("Error updating register '%s': %s", reg.get("name"), err)
-
+                    _LOGGER.error("Error updating register '%s': %s", reg.get("name"), err, exc_info=True)
+    
         if options_changed:
-            _LOGGER.warning("Detected register types updated; will take effect after options reload")
-              # self.hass.config_entries.async_update_entry(
-                 # self.my_config_entry,
-               # options={**self.my_config_entry.options, CONF_REGISTERS: updated_registers},
-            # )
-
+            _LOGGER.info("Detected register types updated; will take effect after options reload")
+    
         if not new_data:
             _LOGGER.debug("No register values produced in this update cycle")
-
+        else:
+            _LOGGER.debug("Update cycle complete with %d values", len(new_data))
+    
         return new_data
 
     # ------------------------------------------------------------------
@@ -341,6 +355,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         """Decode registers or bits using the modern client mixin."""
         if not values:
             return None
+        
         try:
             dt = data_type.lower()
         
@@ -364,18 +379,21 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 else:
                     # Multi-bit → pack into integer (big-endian bit order)
                     decoded = int("".join("1" if b else "0" for b in values[::-1]), 2)
-            else:
-                # Normal register decoding
-                try:
-                    decoded = self.client.convert_from_registers(
-                        registers=values,
-                        data_type=target_type,
-                        byte_order=byte_order.lower(),
-                        word_order=word_order.lower(),
-                    )
-                except Exception as err:
-                    _LOGGER.warning("Failed to decode %s as %s: %s", values, data_type, err)
-                    return None
+                
+                # IMPORTANT: Don't apply scale/offset to boolean values
+                return decoded
+            
+            # Normal register decoding
+            try:
+                decoded = self.client.convert_from_registers(
+                    registers=values,
+                    data_type=target_type,
+                    byte_order=byte_order.lower(),
+                    word_order=word_order.lower(),
+                )
+            except Exception as err:
+                _LOGGER.warning("Failed to decode %s as %s: %s", values, data_type, err)
+                return None
         
             # Post-processing
             if target_type == ModbusClientMixin.DATATYPE.FLOAT32 and isinstance(decoded, float):
@@ -383,16 +401,22 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             if target_type == ModbusClientMixin.DATATYPE.STRING and isinstance(decoded, str):
                 decoded = decoded.rstrip("\x00")
         
-            # Apply scale and offset (after decoding)
-            if reg is not None:
+            # Apply scale and offset (after decoding, but NOT for booleans/strings)
+            if reg is not None and isinstance(decoded, (int, float)):
                 scale = reg.get("scale", 1.0)
                 offset = reg.get("offset", 0.0)
-                if isinstance(decoded, (int, float)):
-                    decoded = decoded * scale + offset
+                decoded = decoded * scale + offset
         
             return decoded
+            
         except Exception as err:
-            _LOGGER.warning("Error decoding register data '%s': %s", reg.get("name"), err)
+            _LOGGER.error(
+                "Error decoding register '%s' at address %s: %s",
+                reg.get("name") if reg else "unknown",
+                reg.get("address") if reg else "unknown",
+                err
+            )
+            return None
     
     def _encode_value(
         self,
