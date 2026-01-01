@@ -389,12 +389,12 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 target_type = dt_map.get(dt, ModbusClientMixin.DATATYPE.UINT16)
             
                 try:
-                    # pymodbus 3.10+ only supports word_order (wordorder)
+                    # pymodbus 3.10+ uses word_order parameter
                     # byte order is always big-endian per Modbus standard
                     decoded = self.client.convert_from_registers(
                         registers=values,
                         data_type=target_type,
-                        wordorder=0 if word_order.lower() == "big" else 1,  # 0=big, 1=little
+                        word_order=0 if word_order.lower() == "big" else 1,  # 0=big, 1=little
                     )
                 except Exception as err:
                     _LOGGER.warning("Failed to decode %s as %s: %s", values, data_type, err)
@@ -475,7 +475,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             return self.client.convert_to_registers(
                 value=value,
                 data_type=target_type,
-                wordorder=0 if word_order.lower() == "big" else 1,  # 0=big, 1=little
+                word_order=0 if word_order.lower() == "big" else 1,  # 0=big, 1=little
             )
         except Exception as err:
             _LOGGER.error(
