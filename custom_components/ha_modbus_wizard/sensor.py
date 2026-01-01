@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # Registry of active entities for this config entry
     entities: dict[str, ModbusWizardSensor] = {}
+    ent_reg = er.async_get(hass)
 
     def _entity_unique_id(reg: dict[str, Any]) -> str:
         """Stable unique_id independent of display name changes."""
@@ -45,7 +46,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         # ---- ADD / KEEP ----
         new_entities: list[Entity] = []
-        ent_reg = er.async_get(hass)
         for reg in current_regs:
             if reg.get("rw", "read") not in ("read", "rw"):
                 continue
