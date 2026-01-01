@@ -26,6 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     )
 
     entities: dict[str, ModbusWizardNumber] = {}
+    ent_reg = er.async_get(hass)
 
     def _unique_id(reg: dict[str, Any]) -> str:
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_number"
@@ -61,7 +62,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         for uid in list(entities):
             if uid not in desired_ids:
-                ent_reg = er.async_get(hass)
                 entity = entities.pop(uid)
                 if entity.entity_id:
                     ent_reg.async_remove(entity.entity_id)
