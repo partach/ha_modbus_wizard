@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     def _entity_unique_id(reg: dict[str, Any]) -> str:
         """Stable unique_id independent of display name changes."""
-        return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}"
+        return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_sensor"
 
     async def _handle_options_update(hass: HomeAssistant, entry: ConfigEntry) -> None:
         await _sync_entities()
