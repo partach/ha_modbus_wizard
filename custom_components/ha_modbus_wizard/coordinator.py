@@ -223,7 +223,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     
         registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
         if not registers:
-            _LOGGER.debug("No registers yet defined")
             return {}
         
         updated_registers = [dict(reg) for reg in registers]
@@ -237,16 +236,10 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 count = int(reg.get("size", 1))
                 reg_type = reg.get("register_type", "holding")
     
-                _LOGGER.debug(
-                    "Processing register '%s': address=%s, type=%s, count=%s, data_type=%s",
-                    reg["name"], address, reg_type, count, reg.get("data_type", "uint16")
-                )
-    
                 result = None
                 try:
                     # -------- AUTO DETECT --------
                     if reg_type == "auto":
-                        _LOGGER.debug("Auto-detect path for register '%s' at address %s", reg["name"], address)
                         methods = [
                             ("holding", self.client.read_holding_registers),
                             ("input", self.client.read_input_registers),
@@ -281,7 +274,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     
                     # -------- DIRECT READ --------
                     if result is None:
-                        _LOGGER.debug("Direct read for register '%s' as type '%s'", reg["name"], reg_type)
                         if reg_type == "holding":
                             result = await self.client.read_holding_registers(address=address, count=count, device_id=self.slave_id)
                         elif reg_type == "input":
@@ -301,10 +293,8 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     # Extract values based on type
                     if reg_type in ("coil", "discrete"):
                         values = result.bits[:count]
-                        _LOGGER.debug("Read bits for '%s': %s", reg["name"], values)
                     else:
                         values = result.registers[:count]
-                        _LOGGER.debug("Read registers for '%s': %s", reg["name"], values)
     
                     if not values:
                         _LOGGER.warning("No values returned for register '%s'", reg["name"])
@@ -321,7 +311,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                     
                     if decoded is not None:
                         new_data[key] = decoded
-                        _LOGGER.debug("Register '%s' (%s) → %s (type: %s)", reg["name"], key, decoded, type(decoded).__name__)
                     else:
                         _LOGGER.warning("Decode returned None for register '%s'", reg["name"])
     
@@ -333,9 +322,6 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     
         if not new_data:
             _LOGGER.debug("No register values produced in this update cycle")
-        else:
-            _LOGGER.debug("Update cycle complete with %d values", len(new_data))
-    
         return new_data
 
     # ------------------------------------------------------------------
