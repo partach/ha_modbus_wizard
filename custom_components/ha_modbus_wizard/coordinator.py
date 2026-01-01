@@ -303,6 +303,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                         reg.get("data_type", "uint16"),
                         reg.get("byte_order", "big"),
                         reg.get("word_order", "big"),
+                        reg=reg,
                     )
                     _LOGGER.debug("Register %s (%s) → %s", reg["name"], key, new_data[key])
 
@@ -325,7 +326,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # De/encoding (Using Pymodbus Mixin String-based Endianness)
     # ------------------------------------------------------------------
    
-    def _decode_value(self, registers, data_type, byte_order="big", word_order="big"):
+    def _decode_value(self, registers, data_type, byte_order="big", word_order="big",reg: dict | None = None):
         """Decode registers using client mixin with string-based orders."""
         if not isinstance(registers, list) or len(registers) == 0:
             _LOGGER.debug("Nothing to decode, no result from register %s", registers)
@@ -362,30 +363,48 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 return round(decoded, 6)
             if target_type == dt.STRING and isinstance(decoded, str):
                 return decoded.rstrip("\x00")  # Clean null padding
-    
+            if reg is not None:  # reg is the register dict from config
+                scale = reg.get("scale", 1.0)
+                offset = reg.get("offset", 0.0)
+                decoded_value = decoded_value * scale + offset  
             return decoded
     
         except Exception as err:
             _LOGGER.warning("Failed to decode %s as %s: %s", registers, data_type, err)
             return None  # or registers for raw fallback
 
-    def _encode_value(self, value, data_type, byte_order="big", word_order="big"):
-        """Encode value to registers using client mixin with string-based orders."""
+    def _encode_value(self, value, data_type, byte_order="big", word_order="big", reg: dict | None = None):
+        """Encode value to registers using client mixin.
+        Applies reverse scale/offset if reg dict is provided."""
         dt = self.client.DATATYPE
         dt_map = {
-            "uint16": dt.UINT16,
-            "int16": dt.INT16,
-            "uint32": dt.UINT32,
-            "int32": dt.INT32,
+            "uint16": dt.UINT16, "int16": dt.INT16,
+            "uint32": dt.UINT32, "int32": dt.INT32,
             "float32": dt.FLOAT32,
+            "uint64": dt.UINT64, "int64": dt.INT64,
+            # Note: string encoding not supported via convert_to_registers
         }
 
-        target_type = dt_map.get(data_type, dt.UINT16)
+        target_type = dt_map.get(data_type.lower(), dt.UINT16)
 
-        return self.client.convert_to_registers(
-            value,
-            data_type=target_type,
-            byte_order=byte_order.lower(),
-            word_order=word_order.lower(),
-        )
+        # Reverse-apply scale and offset before encoding (if provided)
+        if reg is not None:
+            scale = reg.get("scale", 1.0)
+            offset = reg.get("offset", 0.0)
+            if scale != 0 and isinstance(value, (int, float)):
+                value = (value - offset) / scale  # reverse: (displayed - offset) / scale
+
+        try:
+            return self.client.convert_to_registers(
+                value=value,
+                data_type=target_type,
+                byte_order=byte_order.lower(),
+                word_order=word_order.lower(),
+            )
+        except Exception as err:
+            _LOGGER.error(
+                "Failed to encode value %s as %s (byte=%s, word=%s): %s",
+                value, data_type, byte_order, word_order, err
+            )
+            raise  # Let caller handle write failure
 
