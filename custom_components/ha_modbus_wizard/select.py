@@ -26,13 +26,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     )
 
     entities: dict[str, ModbusWizardSelect] = {}
+    ent_reg = er.async_get(hass)
 
     def _unique_id(reg: dict[str, Any]) -> str:
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_select"
 
     async def _sync_entities() -> None:
         current_regs = entry.options.get(CONF_REGISTERS, [])
-        desired_ids = set()
+        desired_ids = set[str]=set()
         new_entities: list[Entity] = []
 
         for reg in current_regs:
@@ -62,7 +63,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
         for uid in list(entities):
             if uid not in desired_ids:
-                ent_reg = er.async_get(hass)
                 entity = entities.pop(uid)
                 if entity.entity_id:
                     ent_reg.async_remove(entity.entity_id)
