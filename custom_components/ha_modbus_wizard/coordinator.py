@@ -33,7 +33,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
         )
 
         self.client = client
-        self.slave_id = slave_id
+        self.slave_id = int(slave_id)
         self.my_config_entry = config_entry
 
         self._lock = asyncio.Lock()
