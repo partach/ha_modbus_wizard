@@ -130,22 +130,45 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
-                vol.Optional("unit"): str,
-                vol.Optional("scale", default=1.0): vol.Coerce(float),
-                vol.Optional("offset", default=0.0): vol.Coerce(float),
-                vol.Optional("options"): str,  # JSON mapping for SelectEntity
-
+                vol.Optional("unit", default=""): str,  # empty string as default
+                
+                vol.Optional("scale", default=1.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, advanced=True)
+                ),
+                vol.Optional("offset", default=0.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, advanced=True)
+                ),
+                vol.Optional("options"): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True, advanced=True)
+                ),
                 vol.Optional("byte_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
+                    selector.SelectSelectorConfig(
+                        options=["big", "little"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        advanced=True,
+                    )
                 ),
                 vol.Optional("word_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
+                    selector.SelectSelectorConfig(
+                        options=["big", "little"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        advanced=True,
+                    )
                 ),
-                vol.Optional("allow_bits", default=False): bool,
-                # NumberEntity bounds
-                vol.Optional("min"): vol.Coerce(float),
-                vol.Optional("max"): vol.Coerce(float),
-                vol.Optional("step", default=1): vol.Coerce(float),
+                vol.Optional("allow_bits", default=False): selector.BooleanSelector(
+                    selector.BooleanSelectorConfig(advanced=True)
+                ),
+                
+                # NumberEntity bounds (advanced)
+                vol.Optional("min"): selector.NumberSelector(
+                    selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, advanced=True)
+                ),
+                vol.Optional("max"): selector.NumberSelector(
+                    selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, advanced=True)
+                ),
+                vol.Optional("step", default=1.0): selector.NumberSelector(
+                    selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, advanced=True)
+                ),
             }),
             errors=errors,
         )
