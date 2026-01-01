@@ -123,6 +123,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
         if key not in hass.data[DOMAIN]["connections"]:
+            _LOGGER.debug("Creating a serial Modbus client in init")
+
             hass.data[DOMAIN]["connections"][key] = AsyncModbusSerialClient(
                 port=config[CONF_SERIAL_PORT],
                 baudrate=config.get(CONF_BAUDRATE, DEFAULT_BAUDRATE),
@@ -132,7 +134,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 timeout=5,
             )
     elif connection_type == CONNECTION_TYPE_IP and protocol == CONNECTION_TYPE_UDP:
-        key = f"tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
+        key = f"ip_udp:{config[CONF_HOST]}:{config[CONF_PORT]}"
+        _LOGGER.debug("Creating a IP-UDP Modbus client in init")
 
         if key not in hass.data[DOMAIN]["connections"]:
             hass.data[DOMAIN]["connections"][key] = AsyncModbusUdpClient(
@@ -141,7 +144,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 timeout=5,
             )
     else:  # UDP
-        key = f"tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
+        key = f"ip_tcp:{config[CONF_HOST]}:{config[CONF_PORT]}"
+        _LOGGER.debug("Creating a IP-TCP Modbus client in init")
 
         if key not in hass.data[DOMAIN]["connections"]:
             hass.data[DOMAIN]["connections"][key] = AsyncModbusTcpClient(
@@ -225,7 +229,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         
     async def handle_write_register(call: ServiceCall):
         coordinator = _get_coordinator(call)
-    
+        _LOGGER.debug("About to write to register via external call")
+
         success = await coordinator.async_write_registers(
             address=int(call.data["address"]),
             value=call.data["value"],
@@ -240,6 +245,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def handle_read_register(call: ServiceCall):
         """Service to read a Modbus register and return decoded value."""
         # Required
+        _LOGGER.debug("About to read a register via external call")
         address = int(call.data["address"])
     
         # Optional with defaults
@@ -282,6 +288,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
 
     coordinator = hass.data[DOMAIN]["coordinators"].pop(entry.entry_id, None)
+    _LOGGER.debug("About to unload coordinator")
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
@@ -298,7 +305,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not still_used:
             try:
                 if client.connected:
-                    await client.close()
+                    _LOGGER.debug("Client to close due to unload coordinator")
+                    client.close()
             except Exception as err:
                 _LOGGER.debug("Error closing Modbus client: %s", err)
 
