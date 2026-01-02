@@ -187,11 +187,14 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
 
     def _save(self) -> None:
+        """Save the current registers list, preserving other options."""
+        new_options = dict(self.config_entry.options)  # full copy
+        new_options[CONF_REGISTERS] = self._registers
         self.hass.config_entries.async_update_entry(
             self.config_entry,
-            options={**self.config_entry.options, CONF_REGISTERS: self._registers},
+            options=new_options,
         )
-        # question remains if this is needed here, maybe it is.
+        # Trigger reload so entities are recreated
         self.hass.async_create_task(
             self.hass.config_entries.async_reload(self.config_entry.entry_id)
         )
