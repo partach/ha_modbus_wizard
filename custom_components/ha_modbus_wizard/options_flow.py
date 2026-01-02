@@ -48,10 +48,12 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             )
             if coordinator:
                 coordinator.update_interval = timedelta(seconds=interval)
-
+            # Preserve ALL existing options, including registers!
+            new_options = dict(self.config_entry.options)
+            new_options[CONF_UPDATE_INTERVAL] = interval
             self.hass.config_entries.async_update_entry(
                 self.config_entry,
-                options={**self.config_entry.options, CONF_UPDATE_INTERVAL: interval},
+                options=new_options,
             )
 
             return self.async_create_entry(title="", data={})
