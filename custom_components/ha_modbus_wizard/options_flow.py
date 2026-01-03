@@ -269,7 +269,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
-            vol.Required("register_type", default=defaults.get("register_type", "auto")): 
+            vol.Required("register_type", default=defaults.get("register_type", "input")): 
                 selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=["auto", "holding", "input", "coil", "discrete"],
@@ -301,8 +301,8 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 ),
             
             vol.Optional("allow_bits", default=defaults.get("allow_bits", False)): bool,
-            vol.Optional("min", default=defaults.get("min")): vol.Coerce(float),
-            vol.Optional("max", default=defaults.get("max")): vol.Coerce(float),
+            vol.Optional("min", default=defaults.get("min")): vol.Any(None,vol.Coerce(float)),
+            vol.Optional("max", default=defaults.get("max")): vol.Any(None,vol.Coerce(float)),
             vol.Optional("step", default=defaults.get("step", 1)): vol.Coerce(float),
         })
 
