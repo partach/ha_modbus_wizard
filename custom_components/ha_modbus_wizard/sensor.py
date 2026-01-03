@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo, Entity, EntityCategory
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN, CONF_REGISTERS, reg_key
+from .const import DOMAIN, CONF_ENTITIES, reg_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     
     async def _sync_entities() -> None:
         """Create, update and remove entities based on options."""
-        current_regs = entry.options.get(CONF_REGISTERS, [])
+        current_regs = entry.options.get(CONF_ENTITIES, [])
         desired_ids = set()
 
         # ---- ADD / KEEP ----
@@ -122,7 +122,7 @@ class ModbusWizardHubEntity(CoordinatorEntity, SensorEntity):
             _LOGGER.error("Failed to property of Wizard Hub Entity: %s", err)
         
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
-    """Single Modbus register sensor."""
+    """Single Modbus entity sensor."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
