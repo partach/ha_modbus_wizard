@@ -205,27 +205,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_services(hass: HomeAssistant) -> None:
 
     def _get_coordinator(call: ServiceCall) -> ModbusWizardCoordinator:
-        entity_id = call.data.get("entity_id")
-        if isinstance(entity_id, list):
-            entity_id = entity_id[0]
-        if not entity_id:
-            raise HomeAssistantError("entity_id is required")
-        if not entity_id:
-            raise HomeAssistantError("entity_id required")
-
+        # Get entity_id from service target (correct for target-based services)
+        entity_ids = call.target.get("entity_id") if call.target else None
+        if not entity_ids:
+            raise HomeAssistantError("No modbus hub available")
+    
+        entity_id = entity_ids[0]
+    
+        # Resolve state
         state = hass.states.get(entity_id)
         if not state:
-            raise HomeAssistantError("Entity not found")
-
+            raise HomeAssistantError(f"Entity not found: {entity_id}")
+    
+        # Resolve config entry
         entry_id = state.attributes.get("config_entry_id")
         if not entry_id:
             raise HomeAssistantError("Entity not linked to config entry")
-
+    
+        # Get coordinator
         coordinator = hass.data[DOMAIN]["coordinators"].get(entry_id)
         if not coordinator:
             raise HomeAssistantError("Coordinator not found")
-
+    
         return coordinator
+
         
     async def handle_write_register(call: ServiceCall):
         coordinator = _get_coordinator(call)
