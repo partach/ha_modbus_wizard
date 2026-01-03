@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.components.number import NumberEntity
 from homeassistant.helpers import entity_registry as er
-from .const import DOMAIN, CONF_REGISTERS, reg_key
+from .const import DOMAIN, CONF_ENTITIES, reg_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_number"
 
     async def _sync_entities() -> None:
-        current_regs = entry.options.get(CONF_REGISTERS, [])
+        current_regs = entry.options.get(CONF_ENTITIES, [])
         desired_ids = set()
         new_entities: list[Entity] = []
 
