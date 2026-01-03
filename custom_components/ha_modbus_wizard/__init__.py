@@ -203,14 +203,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_setup_services(hass: HomeAssistant) -> None:
-
     def _get_coordinator(call: ServiceCall) -> ModbusWizardCoordinator:
-        # Get entity_id from service target (correct for target-based services)
-        entity_ids = call.target.get("entity_id") if call.target else None
-        if not entity_ids:
-            raise HomeAssistantError("No modbus hub available")
-    
-        entity_id = entity_ids[0]
+        # Try to get entity_id from multiple sources (for compatibility)
+        entity_id = None
+        
+        # 1. From service_data (when called via WS with entity_id in data)
+        if "entity_id" in call.data:
+            entity_ids = call.data["entity_id"]
+            if isinstance(entity_ids, list):
+                entity_id = entity_ids[0] if entity_ids else None
+            else:
+                entity_id = entity_ids
+        
+        # 2. From target (when called via UI with target selector)
+        elif call.target and call.target.get("entity_id"):
+            entity_ids = call.target.get("entity_id")
+            entity_id = entity_ids[0] if isinstance(entity_ids, list) else entity_ids
+        
+        if not entity_id:
+            raise HomeAssistantError("entity_id is required")
     
         # Resolve state
         state = hass.states.get(entity_id)
@@ -228,12 +239,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("Coordinator not found")
     
         return coordinator
-
         
     async def handle_write_register(call: ServiceCall):
         coordinator = _get_coordinator(call)
         _LOGGER.debug("About to write to register via external call")
-
+        
         success = await coordinator.async_write_registers(
             address=int(call.data["address"]),
             value=call.data["value"],
@@ -247,24 +257,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     
     async def handle_read_register(call: ServiceCall):
         """Service to read a Modbus register and return decoded value."""
-        # Required
         _LOGGER.debug("About to read a register via external call")
+        
         address = int(call.data["address"])
-    
-        # Optional with defaults
-        register_type = call.data.get("register_type", "holding").lower()  # holding, input, coil, discrete, auto
+        register_type = call.data.get("register_type", "holding").lower()
         data_type = call.data.get("data_type", "uint16")
-        size = int(call.data.get("size", 1))  # Override size (e.g., for float32 = 2)
+        size = int(call.data.get("size", 1))
         byte_order = call.data.get("byte_order", "big")
         word_order = call.data.get("word_order", "big")
-        raw = call.data.get("raw", False)  # Return raw registers if True
+        raw = call.data.get("raw", False)
     
         coordinator = _get_coordinator(call)
         if coordinator is None:
             raise HomeAssistantError("No coordinator found for this device")
-    
-        # Use the full polling logic for consistency (handles auto-detect, etc.)
-        # Or call a new helper — but reuse existing logic if possible
     
         value = await coordinator.async_read_typed(
             address=address,
@@ -272,19 +277,29 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             byte_order=byte_order,
             word_order=word_order,
             size=size,
-            register_type=register_type,  # ← Pass type
+            register_type=register_type,
             raw=raw,
         )
     
         if value is None:
             raise HomeAssistantError(f"Failed to read address {address}")
-    
+        
+        _LOGGER.debug("Read successful, returning value: %s", value)
         return {"value": value}
         
-    # register the services    
-    hass.services.async_register(DOMAIN, "write_register", handle_write_register)
-    hass.services.async_register(DOMAIN, "read_register", handle_read_register)
-
+    # Register the services with supports_response
+    hass.services.async_register(
+        DOMAIN, 
+        "write_register", 
+        handle_write_register
+    )
+    
+    hass.services.async_register(
+        DOMAIN, 
+        "read_register", 
+        handle_read_register,
+        supports_response=SupportsResponse.ONLY,  # This service ONLY returns responses
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
