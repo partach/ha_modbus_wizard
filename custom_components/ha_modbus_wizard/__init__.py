@@ -8,6 +8,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from pymodbus.client import AsyncModbusSerialClient, AsyncModbusTcpClient, AsyncModbusUdpClient
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.service import SupportsResponse
 from datetime import timedelta
 from .const import (
     CONF_BAUDRATE,
