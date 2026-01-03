@@ -28,14 +28,120 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             menu_options={
                 "settings": "Settings",
                 "add_register": "Add register",
+                "edit_register": "Edit register",
                 "list_registers": f"Registers ({len(self._registers)})",
             },
         )
 
     # ------------------------------------------------------------------
+    # Edit
+    # ------------------------------------------------------------------
+    async def async_step_edit_register(self, user_input=None):
+        if user_input is not None:
+            self._edit_index = int(user_input["register"])
+            return await self.async_step_edit_register_form()
+    
+        labels = {
+            str(i): f"{r['name']} (@{r['address']})"
+            for i, r in enumerate(self._registers)
+        }
+    
+        return self.async_show_form(
+            step_id="edit_register",
+            data_schema=vol.Schema({
+                vol.Required("register"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=labels,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }),
+        )
+        
+    # ------------------------------------------------------------------
+    # Edit Form
+    # ------------------------------------------------------------------
+    async def async_step_edit_register_form(self, user_input=None):
+        reg = self._registers[self._edit_index]
+        errors = {}
+    
+        if user_input is not None:
+            # Parse options JSON
+            raw_opts = user_input.get("options")
+            if raw_opts:
+                try:
+                    user_input["options"] = json.loads(raw_opts)
+                except json.JSONDecodeError:
+                    errors["options"] = "invalid_json"
+    
+            # Enforce size from datatype
+            type_sizes = {
+                "uint16": 1, "int16": 1,
+                "uint32": 2, "int32": 2,
+                "float32": 2,
+                "uint64": 4, "int64": 4,
+            }
+            dtype = user_input.get("data_type")
+            if dtype in type_sizes:
+                user_input["size"] = type_sizes[dtype]
+    
+            if not errors:
+                self._registers[self._edit_index] = user_input
+                self._save()
+                return await self.async_step_init()
+    
+        return self.async_show_form(
+            step_id="edit_register_form",
+            data_schema=vol.Schema({
+                vol.Required("name", default=reg.get("name")): str,
+                vol.Required("address", default=reg.get("address")):
+                    vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
+    
+                vol.Required("data_type", default=reg.get("data_type", "uint16")):
+                    selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=["uint16","int16","uint32","int32","float32","uint64","int64"],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+    
+                vol.Required("register_type", default=reg.get("register_type","auto")):
+                    selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=["auto","holding","input","coil","discrete"],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+    
+                vol.Required("rw", default=reg.get("rw","read")):
+                    selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=["read","write","rw"],
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+    
+                vol.Optional("unit", default=reg.get("unit","")): str,
+                vol.Optional("scale", default=reg.get("scale",1.0)): vol.Coerce(float),
+                vol.Optional("offset", default=reg.get("offset",0.0)): vol.Coerce(float),
+                vol.Optional("options", default=json.dumps(reg.get("options",""))): str,
+    
+                vol.Optional("byte_order", default=reg.get("byte_order","big")):
+                    selector.SelectSelector(selector.SelectSelectorConfig(options=["big","little"])),
+    
+                vol.Optional("word_order", default=reg.get("word_order","big")):
+                    selector.SelectSelector(selector.SelectSelectorConfig(options=["big","little"])),
+    
+                vol.Optional("allow_bits", default=reg.get("allow_bits",False)): bool,
+                vol.Optional("min", default=reg.get("min")): vol.Coerce(float),
+                vol.Optional("max", default=reg.get("max")): vol.Coerce(float),
+                vol.Optional("step", default=reg.get("step",1)): vol.Coerce(float),
+            }),
+            errors=errors,
+        )
+    # ------------------------------------------------------------------
     # SETTINGS
     # ------------------------------------------------------------------
-
     async def async_step_settings(self, user_input=None):
         if user_input is not None:
             interval = user_input[CONF_UPDATE_INTERVAL]
@@ -56,7 +162,11 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 options=new_options,
             )
 
-            return self.async_create_entry(title="", data={})
+            # return self.async_create_entry(
+            #    title="",
+            #    data=self.config_entry.options,
+            # )
+            return self.async_abort(reason="settings_updated")
 
         current = self.config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
 
@@ -192,6 +302,9 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         """Save the current registers list, preserving other options."""
         new_options = dict(self.config_entry.options)  # full copy
         new_options[CONF_REGISTERS] = self._registers
+        for r in self._registers:
+            r["address"] = int(r["address"])  # make sure we have integers for those, no floats creep through
+            r["size"] = int(r.get("size", 1))
         self.hass.config_entries.async_update_entry(
             self.config_entry,
             options=new_options,
