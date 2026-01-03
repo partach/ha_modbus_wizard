@@ -21,37 +21,45 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry):
         # self.config_entry = config_entry
         self._registers: list[dict] = list(config_entry.options.get(CONF_REGISTERS, []))
-
+        self._edit_index: int | None = None
+        
     async def async_step_init(self, user_input=None):
-        return self.async_show_menu(
-            step_id="init",
-            menu_options={
+            menu_options = {
                 "settings": "Settings",
                 "add_register": "Add register",
-                "edit_register": "Edit register",
-                "list_registers": f"Registers ({len(self._registers)})",
-            },
-        )
+            }
+            if len(self._registers) > 0:
+                menu_options["list_registers"] = f"Registers ({len(self._registers)})"
+                menu_options["edit_register"] = "Edit register"
+            return self.async_show_menu(
+                step_id="init",
+                menu_options=menu_options,
+            )
 
     # ------------------------------------------------------------------
     # Edit
     # ------------------------------------------------------------------
     async def async_step_edit_register(self, user_input=None):
+        """Select which register to edit."""
         if user_input is not None:
             self._edit_index = int(user_input["register"])
             return await self.async_step_edit_register_form()
     
-        labels = {
-            str(i): f"{r['name']} (@{r['address']})"
+        # Create dropdown options: index -> display label
+        options = [
+            selector.SelectOptionDict(
+                value=str(i),
+                label=f"{r['name']} (Address {r['address']}, {r.get('data_type', 'uint16')})"
+            )
             for i, r in enumerate(self._registers)
-        }
+        ]
     
         return self.async_show_form(
             step_id="edit_register",
             data_schema=vol.Schema({
                 vol.Required("register"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=labels,
+                        options=options,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 )
@@ -59,9 +67,11 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         )
         
     # ------------------------------------------------------------------
-    # Edit Form
+    # EDIT REGISTER FORM
     # ------------------------------------------------------------------
+    
     async def async_step_edit_register_form(self, user_input=None):
+        """Edit the selected register."""
         reg = self._registers[self._edit_index]
         errors = {}
     
@@ -84,59 +94,39 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             dtype = user_input.get("data_type")
             if dtype in type_sizes:
                 user_input["size"] = type_sizes[dtype]
+
+            # Ensure numeric fields are correct type
+            user_input["address"] = int(user_input["address"])
+            user_input["size"] = int(user_input.get("size", 1))
     
             if not errors:
                 self._registers[self._edit_index] = user_input
-                self._save()
+                self._save_options({CONF_REGISTERS: self._registers})
+                _LOGGER.info("Register '%s' updated", user_input.get("name"))
                 return await self.async_step_init()
     
+        # Prepare defaults from existing register
+        defaults = {
+            "name": reg.get("name"),
+            "address": reg.get("address"),
+            "data_type": reg.get("data_type", "uint16"),
+            "register_type": reg.get("register_type", "auto"),
+            "rw": reg.get("rw", "read"),
+            "unit": reg.get("unit", ""),
+            "scale": reg.get("scale", 1.0),
+            "offset": reg.get("offset", 0.0),
+            "options": json.dumps(reg.get("options", {})) if reg.get("options") else "",
+            "byte_order": reg.get("byte_order", "big"),
+            "word_order": reg.get("word_order", "big"),
+            "allow_bits": reg.get("allow_bits", False),
+            "min": reg.get("min"),
+            "max": reg.get("max"),
+            "step": reg.get("step", 1),
+        }
+
         return self.async_show_form(
             step_id="edit_register_form",
-            data_schema=vol.Schema({
-                vol.Required("name", default=reg.get("name")): str,
-                vol.Required("address", default=reg.get("address")):
-                    vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
-    
-                vol.Required("data_type", default=reg.get("data_type", "uint16")):
-                    selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=["uint16","int16","uint32","int32","float32","uint64","int64"],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
-    
-                vol.Required("register_type", default=reg.get("register_type","auto")):
-                    selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=["auto","holding","input","coil","discrete"],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
-    
-                vol.Required("rw", default=reg.get("rw","read")):
-                    selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=["read","write","rw"],
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                        )
-                    ),
-    
-                vol.Optional("unit", default=reg.get("unit","")): str,
-                vol.Optional("scale", default=reg.get("scale",1.0)): vol.Coerce(float),
-                vol.Optional("offset", default=reg.get("offset",0.0)): vol.Coerce(float),
-                vol.Optional("options", default=json.dumps(reg.get("options",""))): str,
-    
-                vol.Optional("byte_order", default=reg.get("byte_order","big")):
-                    selector.SelectSelector(selector.SelectSelectorConfig(options=["big","little"])),
-    
-                vol.Optional("word_order", default=reg.get("word_order","big")):
-                    selector.SelectSelector(selector.SelectSelectorConfig(options=["big","little"])),
-    
-                vol.Optional("allow_bits", default=reg.get("allow_bits",False)): bool,
-                vol.Optional("min", default=reg.get("min")): vol.Coerce(float),
-                vol.Optional("max", default=reg.get("max")): vol.Coerce(float),
-                vol.Optional("step", default=reg.get("step",1)): vol.Coerce(float),
-            }),
+            data_schema=self._get_register_schema(defaults),
             errors=errors,
         )
     # ------------------------------------------------------------------
@@ -154,19 +144,13 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             )
             if coordinator:
                 coordinator.update_interval = timedelta(seconds=interval)
-            # Preserve ALL existing options, including registers!
-            new_options = dict(self.config_entry.options)
-            new_options[CONF_UPDATE_INTERVAL] = interval
-            self.hass.config_entries.async_update_entry(
-                self.config_entry,
-                options=new_options,
-            )
+                _LOGGER.debug("Updated coordinator interval to %d seconds", interval)
 
-            # return self.async_create_entry(
-            #    title="",
-            #    data=self.config_entry.options,
-            # )
+            # Save settings - preserve ALL existing options
+            self._save_options({CONF_UPDATE_INTERVAL: interval})
+            
             return self.async_abort(reason="settings_updated")
+
 
         current = self.config_entry.options.get(CONF_UPDATE_INTERVAL, 10)
 
@@ -208,59 +192,20 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             dtype = user_input.get("data_type")
             if dtype in type_sizes:
                 user_input["size"] = type_sizes[dtype]
-
+            # Ensure numeric fields are correct type
+            user_input["address"] = int(user_input["address"])
+            user_input["size"] = int(user_input.get("size", 1))
+            
             if not errors:
                 _LOGGER.debug("Adding register: %s", user_input)
                 self._registers.append(user_input)
-                self._save()
-                _LOGGER.info(
-                    "Total registers after save: %d, config_entry options: %s",
-                    len(self._registers),
-                    self.config_entry.options.get(CONF_REGISTERS),
-                )
+                self._save_options({CONF_REGISTERS: self._registers})
+                _LOGGER.info("Register added. Total: %d", len(self._registers))
                 return await self.async_step_init()
 
         return self.async_show_form(
             step_id="add_register",
-            data_schema=vol.Schema({
-                vol.Required("name"): str,
-                vol.Required("address"): vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
-                vol.Required("data_type", default="uint16"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=["uint16", "int16", "uint32", "int32", "float32", "uint64", "int64"],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-
-                vol.Required("register_type", default="auto"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=["auto", "holding", "input", "coil", "discrete"],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-
-                vol.Required("rw", default="read"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=["read", "write", "rw"],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Optional("unit"): str,
-                vol.Optional("scale", default=1.0): vol.Coerce(float),
-                vol.Optional("offset", default=0.0): vol.Coerce(float),
-                vol.Optional("options"): str, # JSON mapping for SelectEntity
-                vol.Optional("byte_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
-                ),
-                vol.Optional("word_order", default="big"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["big", "little"])
-                ),
-                vol.Optional("allow_bits", default=False): bool,
-                # NumberEntity bounds
-                vol.Optional("min"): vol.Coerce(float),
-                vol.Optional("max"): vol.Coerce(float),
-                vol.Optional("step", default=1): vol.Coerce(float),
-            }),
+            data_schema=self._get_register_schema(),
             errors=errors,
         )
 
@@ -269,24 +214,34 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
 
     async def async_step_list_registers(self, user_input=None):
+        """List and optionally delete registers."""
         if user_input is not None:
             delete = set(user_input.get("delete", []))
             if delete:
+                # Delete by index
                 self._registers = [
-                    r for r in self._registers
-                    if f"{r['name']} (@{r['address']})" not in delete
+                    r for i, r in enumerate(self._registers)
+                    if str(i) not in delete
                 ]
-                self._save()
+                self._save_options({CONF_REGISTERS: self._registers})
+                _LOGGER.info("Deleted %d registers. Remaining: %d", len(delete), len(self._registers))
             return await self.async_step_init()
 
-        labels = [f"{r['name']} (@{r['address']})" for r in self._registers]
+        # Create selection options with index as value
+        options = [
+            selector.SelectOptionDict(
+                value=str(i),
+                label=f"{r['name']} (Address {r['address']}, {r.get('data_type', 'uint16')})"
+            )
+            for i, r in enumerate(self._registers)
+        ]
 
         return self.async_show_form(
             step_id="list_registers",
             data_schema=vol.Schema({
                 vol.Optional("delete"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=labels,
+                        options=options,
                         multiple=True,
                         mode=selector.SelectSelectorMode.LIST,
                     )
@@ -297,11 +252,65 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
     # HELPERS
     # ------------------------------------------------------------------
+    def _get_register_schema(self, defaults: dict | None = None) -> vol.Schema:
+        """Get the register form schema with optional defaults."""
+        defaults = defaults or {}
+        
+        return vol.Schema({
+            vol.Required("name", default=defaults.get("name")): str,
+            vol.Required("address", default=defaults.get("address")): 
+                vol.All(vol.Coerce(int), vol.Range(min=0, max=65535)),
+            
+            vol.Required("data_type", default=defaults.get("data_type", "uint16")): 
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["uint16", "int16", "uint32", "int32", "float32", "uint64", "int64"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
 
-    def _save(self) -> None:
+            vol.Required("register_type", default=defaults.get("register_type", "auto")): 
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["auto", "holding", "input", "coil", "discrete"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+
+            vol.Required("rw", default=defaults.get("rw", "read")): 
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["read", "write", "rw"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            
+            vol.Optional("unit", default=defaults.get("unit", "")): str,
+            vol.Optional("scale", default=defaults.get("scale", 1.0)): vol.Coerce(float),
+            vol.Optional("offset", default=defaults.get("offset", 0.0)): vol.Coerce(float),
+            vol.Optional("options", default=defaults.get("options", "")): str,
+            
+            vol.Optional("byte_order", default=defaults.get("byte_order", "big")): 
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=["big", "little"])
+                ),
+            
+            vol.Optional("word_order", default=defaults.get("word_order", "big")): 
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=["big", "little"])
+                ),
+            
+            vol.Optional("allow_bits", default=defaults.get("allow_bits", False)): bool,
+            vol.Optional("min", default=defaults.get("min")): vol.Coerce(float),
+            vol.Optional("max", default=defaults.get("max")): vol.Coerce(float),
+            vol.Optional("step", default=defaults.get("step", 1)): vol.Coerce(float),
+        })
+
+    def _save_options(self, updates: dict) -> None:
         """Save the current registers list, preserving other options."""
         new_options = dict(self.config_entry.options)  # full copy
-        new_options[CONF_REGISTERS] = self._registers
+        # Update only the specified keys
+        new_options.update(updates)
         for r in self._registers:
             r["address"] = int(r["address"])  # make sure we have integers for those, no floats creep through
             r["size"] = int(r.get("size", 1))
