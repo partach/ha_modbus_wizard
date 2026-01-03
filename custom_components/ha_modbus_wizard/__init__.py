@@ -224,21 +224,35 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if not entity_id:
             raise HomeAssistantError("entity_id is required")
     
-        # Resolve state
-        state = hass.states.get(entity_id)
-        if not state:
-            raise HomeAssistantError(f"Entity not found: {entity_id}")
+        _LOGGER.debug("Looking for coordinator for entity: %s", entity_id)
     
-        # Resolve config entry
-        entry_id = state.attributes.get("config_entry_id")
-        if not entry_id:
-            raise HomeAssistantError("Entity not linked to config entry")
+        # Try to find entry_id via entity registry (most reliable)
+        from homeassistant.helpers import entity_registry as er
+        ent_reg = er.async_get(hass)
+        entity_entry = ent_reg.async_get(entity_id)
+        
+        entry_id = None
+        if entity_entry and entity_entry.config_entry_id:
+            entry_id = entity_entry.config_entry_id
+            _LOGGER.debug("Found entry_id via entity registry: %s", entry_id)
+        else:
+            # Fallback: If only one coordinator exists, use it
+            coordinators = hass.data.get(DOMAIN, {}).get("coordinators", {})
+            if len(coordinators) == 1:
+                entry_id = list(coordinators.keys())[0]
+                _LOGGER.debug("Using single available coordinator: %s", entry_id)
+            elif len(coordinators) > 1:
+                _LOGGER.error("Multiple coordinators found, cannot determine which one to use")
+                raise HomeAssistantError(f"Could not determine coordinator for entity {entity_id}")
+            else:
+                raise HomeAssistantError("No coordinators found")
     
         # Get coordinator
         coordinator = hass.data[DOMAIN]["coordinators"].get(entry_id)
         if not coordinator:
-            raise HomeAssistantError("Coordinator not found")
-    
+            raise HomeAssistantError(f"Coordinator not found for entry {entry_id}")
+        
+        _LOGGER.debug("Successfully found coordinator for entry: %s", entry_id)
         return coordinator
         
     async def handle_write_register(call: ServiceCall):
