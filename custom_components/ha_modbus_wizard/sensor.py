@@ -116,7 +116,10 @@ class ModbusWizardHubEntity(CoordinatorEntity, SensorEntity):
         )
     @property
     def native_value(self):
-        return "connected" if self.coordinator.connected else "disconnected"    
+        try:
+          return "connected" if self.coordinator.client.connected else "disconnected"    
+        except Exception as err:
+            _LOGGER.error("Failed to property of Wizard Hub Entity: %s", err)
         
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
     """Single Modbus register sensor."""
