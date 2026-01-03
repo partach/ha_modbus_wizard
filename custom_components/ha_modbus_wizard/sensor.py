@@ -31,7 +31,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     # Registry of active entities for this config entry
     entities: dict[str, ModbusWizardSensor] = {}
     ent_reg = er.async_get(hass)
-
+    entities.extend([
+        ModbusWizardHubEntity(
+            coordinator=coordinator,
+            entry=entry,
+    ])
     def _entity_unique_id(reg: dict[str, Any]) -> str:
         """Stable unique_id independent of display name changes."""
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_sensor"
@@ -95,7 +99,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     remove_listener = entry.add_update_listener(_handle_options_update)
     entry.async_on_unload(remove_listener)
 
-
+class ModbusWizardHubEntity(CoordinatorEntity, SensorEntity):
+    _attr_name = "Modbus Wizard Hub"
+    _attr_has_entity_name = True
+    _attr_native_value = "online"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC  # ← hides it from default UI views
+    _attr_icon = "mdi:lan-connect"
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_hub"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title or "Modbus Wizard",
+            manufacturer="Partach",
+            model="Wizard",
+        )
+    @property
+    def native_value(self):
+        return "connected" if self.coordinator.connected else "disconnected"    
+        
 class ModbusWizardSensor(CoordinatorEntity, SensorEntity):
     """Single Modbus register sensor."""
 
