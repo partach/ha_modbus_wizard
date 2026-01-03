@@ -21,7 +21,7 @@ CONF_PARITY = "parity"
 CONF_STOPBITS = "stopbits"
 CONF_BYTESIZE = "bytesize"
 CONF_UPDATE_INTERVAL = "update_interval"
-CONF_REGISTERS = "registers"
+CONF_ENTITIES = "registers"
 # TCP settings
 CONF_HOST = "host"
 CONF_PORT = "port"
