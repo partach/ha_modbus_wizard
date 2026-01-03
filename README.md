@@ -7,98 +7,110 @@
 [![License](https://img.shields.io/github/license/partach/ha_modbus_wizard?color=ffca28&style=flat-square)](https://github.com/partach/ha_modbus_wizard/blob/main/LICENSE)
 [![HACS validated](https://img.shields.io/badge/HACS-validated-41BDF5?style=flat-square)](https://github.com/hacs/integration)
 
-ModbusWizard will help you test and build all your modbus devices **without need for any yaml** or Home Assistant reboots <br>
-(after install of this integration;)!
+# Modbus Wizard for Home Assistant
 
-WORK IN PROGRESS
+**Configure and control Modbus devices entirely from the UI — no YAML, no restarts!**
+
+Modbus Wizard lets you discover, test, and integrate Modbus devices (serial or TCP/UDP) directly in Home Assistant — all through a simple, powerful interface.
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/ha-modbus-wizard-config-6.png" width="600"/>
-  <br><em>Configure your entities runtime</em>
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/ha-modbus-wizard-config-6.png" width="600" alt="Runtime entity configuration"/>
+  <br><em>Add and configure sensors at runtime — no reboots required</em>
 </p>
+
+**Work in progress — actively developed and improving!**
 
 ## Features
-- No need for any yaml configuration!
-- Serial and IP (TCP/UDP) Modbus support
-- USB/Serial port selection via dropdown
-- Runtime adding / changing of register (entities). No reboots!
-- UI card that lets you poll (read) or write ANY register (you can play around with the device at will)
-- Hassle free use of the device you control, only create entities you need if you want to keep/use sensors of that device in HA
-- Multiple hubs supported, ability to add multiple modbus devices and entities per device.
-- configurable refresh speeds for data
-- Automations possible, read and write on modbus!
-- Very easy and straight forward!
-- 
-## Serial and TCP Modbus
-It supports modbus USB dongle and IP (TCP/UDP) Modbus connections<br>
+
+- **Zero YAML configuration** — everything done via the Home Assistant UI
+- Full support for **serial (RS485/USB)** and **IP-based Modbus (TCP & UDP)**
+- **Runtime entity management** — add, edit, or remove sensors without restarting HA
+- Dedicated **Lovelace card** for live reading/writing any register (perfect for testing and debugging)
+- Create only the entities you need — keep your setup clean and efficient
+- Multiple devices supported simultaneously
+- Configurable refresh intervals per device
+- Full automation support — use sensors in automations, scripts, and dashboards
+- Advanced options: scaling, offset, byte/word order, bit handling, and more
+
+<p align="center">
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-card.png" width="350" alt="Modbus Wizard Card"/>
+  <br><em>Probe and control any register in real-time with the included card</em>
+</p>
 
 ## Installation
-Options:
-1. Install via HACS (is coming in the near future)
-2. Install manually:
-   * The integration: In UI go to `HACS`--> `custom repositories` --> `Repo`: partach/ha_modbus_wizard, `Type`: Integration
-   * After HA reboot (Needed for new integrations): choose 'add integration' (in devices and services) and choose `ha_modbus_wizard` in the list.
 
-## Installing the card
-After installation of the integration you need to first reboot HA. The card will be automatically registered by the integration on start up.<br>
-But a browser refresh is needed to see it for the first time...<br>
-To use the card in your dashboard, go to you dashboard, edit, choose `Add card`<br>
-**It can be found in the card overview at custom cards**.<br>
+### Option 1: HACS (Recommended — coming soon)
+Once available in HACS default repository, install with one click.
 
-Or.. Choose `Manual / yaml` Add first line: `type: custom:modbus_wizard-card`. <br>
-Then choose the `visual editor` to continue. From the `Device` dropdown chose your Modbus Wizard device.
+### Option 2: Manual Install
+1. Go to **HACS → Integrations → ⋮ → Custom repositories**
+2. Add repository:  
+   URL: `https://github.com/partach/ha_modbus_wizard`  
+   Category: **Integration**
+3. Click **Add**
+4. Search for "Modbus Wizard" and install
+5. **Restart Home Assistant**
+6. Go to **Settings → Devices & Services → + Add Integration** → Search for **Modbus Wizard**
 
-## How does it work?
+> The included Lovelace card is automatically registered on startup.  
+> A browser refresh may be needed the first time to see it.
+
+## Setup Guide
+
+### Step 1: Add Your Modbus Device
+1. Click **+ Add Integration** → Choose **Modbus Wizard**
+2. Select connection type: **Serial** or **IP (TCP/UDP)**
+3. Enter:
+   - Slave ID (usually 1)
+   - A test register address (often 0 or 30001 → use 0 in the integration)
+   - Test register size (usually 1 or 2)
+4. Provide connection details (port, baudrate, host, etc.)
+5. The integration will auto-test connectivity
+
+→ Success? You're ready!
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-2.png" width="200" style="vertical-align: middle; margin: 0 10px;"/>
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-3.png" width="200" style="vertical-align: middle; margin: 0 10px;"/>
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-1.png" width="600" style="vertical-align: middle; margin: 0 10px;"/>
-<br><em>Steps 1, 2, 3</em>
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-2.png" width="200" alt="Step 1"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-3.png" width="200" alt="Step 2"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-1.png" width="600" alt="Step 3"/>
+  <br><em>Simple 3-step device setup</em>
 </p>
 
-Steps:<br>
-1. Tell in the first dialog if the device you want to control is a serial or modbus over IP device and indicate:
-    * Where you think the first register is at (The Address, often 0),
-    * How big the size / count of the register to read is (often 1 or 2)
-    * Which slave id the device is at (often 1 but you can have up to 255 devices in a single network)
-    * Optionally already indicate what you want as refresh rate (can be changed in options later)
+### Step 2: Explore with the Card (Recommended for Discovery)
+Add the **Modbus Wizard Card** to a dashboard:
+- Edit dashboard → Add card → Search for **"Modbus Wizard Card"**
+- Select your device
 
-2. Give the device a usefull name and provide addtional communication details
-    * In case of serial: which usb port the device is located. In case of IP which protocol (TCP/UDP)
-    * In case of serial: baud rate, etc. In case of IP: port number
+Now you can:
+- Read any register instantly
+- Write values to test device behavior
+- Experiment with data types, byte order, and scaling
 
-Based on this information the integration will auto test if it can find the regiser with different read methods.<br>
-If succesfull, you have reached step 3 and basically the device is installed and the card can be used to freely peek and poke te device. <br>
-If not successfull there can be a problem with the settings (wrong usb, wrong port, wrong register address, ...)
+Perfect for reverse-engineering undocumented devices!
 
-## After successfull device install (and device connection)
+### Step 3: Create Permanent Sensors
+Once you know which registers you want:
+- Go to your Modbus Wizard device → **Configure** → **Add register**
+- Fill in name, address, data type, unit, scaling, etc.
+- Advanced options available (click "Show advanced options")
 
-Basically you can go 2 directions
-1. Use the card to probe your device
-2. If you already know the registers you want to turn into entities (sensors) you can add them.
-
-### Route 1
-The HA card (see figure below). 
-After selecting the wizard device in the dropdown during creation of the card, you will be able to read / write registers at will.
-This will help you find the values you need. Once you have the right data you can turn these into entities for you integration that then can be used in HA. (Route 2)
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-card.png" width="300"/>
-  <br><em>Probe your connected modbus device at will</em>
-</p>
-Use of the card is pretty straight forward. Enter Address of the register, type of register, press read and get the data you need. 
-
-### Route 2
-If you know your stuff you can start adding entities for the registers you want from your modbus device.
-These will be stored an rembered as any other sensors you have in HA.
-Per register you can already enter a lot of data the integration will use. See table below for more detail
-<p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-5.png" width="300"/>
-  <br><em>Probe your connected modbus device at will</em>
+  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-5.png" width="400" alt="Add register form"/>
+  <br><em>Full control over sensor configuration</em>
 </p>
 
-Once you registered your register it will become available in the device entities and will be monitored just like any entity in HA.
-You can also edit them or  delete them (see first picture above in the readme)
+Your new sensors appear immediately — no restart needed.
+
+You can later edit or delete them from the same options menu.
+
+## Why Choose Modbus Wizard?
+
+- **No more YAML hell** — perfect for devices with poor documentation
+- **Fast iteration** — test registers live, then save only what you need
+- **Beginner-friendly** yet powerful for advanced users
+- **Full control** — bit-level access, custom scaling, endianness, raw mode
+
+
 
 #### Modbus Wizard Register Configuration Fields
 
@@ -130,14 +142,23 @@ When adding or editing a register in the Modbus Wizard integration, the followin
 
 These fields give full flexibility for virtually any Modbus device!
 
+## Support & Feedback
+
+This integration is under active development. Found a bug? Have a feature request?
+
+→ Open an issue on GitHub: https://github.com/partach/ha_modbus_wizard/issues
+
+Contributions welcome, see below!
+
+---
+
+**Made with ❤️ for the Home Assistant community**
+
 ## Discussion 
-See [here](https://github.com/partach/ha_modbus_wizard/discussions)
+Once requests are there will be opened here: [here](https://github.com/partach/ha_modbus_wizard/discussions)
 
 ## Changelog
 See [CHANGELOG.md](https://github.com/partach/ha_modbus_wizard/blob/main/CHANGELOG.md)
-
-## Issues
-Report at GitHub [Issues](https://github.com/partach/ha_modbus_wizard/issues)
 
 ## Support development
 If you like it and find it usefull, or want to support this and future developments, it would be greatly appreciated :)
