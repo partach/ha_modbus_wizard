@@ -3,7 +3,7 @@ write_register:
   description: Write a typed value to a Modbus register with proper packing.
   target:
     entity:
-      integration: modbus_wizard
+      integration: ha_modbus_wizard
   fields:
     address:
       name: Register Address
