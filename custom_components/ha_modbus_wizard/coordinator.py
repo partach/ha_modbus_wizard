@@ -8,7 +8,7 @@ from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from .const import CONF_REGISTERS, reg_key
+from .const import CONF_ENTITIES, reg_key
 from pymodbus.client.mixin import ModbusClientMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -216,21 +216,21 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
     # ------------------------------------------------------------------
 
     async def _async_update_data(self) -> dict:
-        """Fetch latest data from configured registers."""
+        """Fetch latest data from configured entities."""
         if not await self._async_connect():
             _LOGGER.warning("Could not connect to Modbus device")
             return {}
     
-        registers = self.my_config_entry.options.get(CONF_REGISTERS, [])
-        if not registers:
+        entities = self.my_config_entry.options.get(CONF_ENTITIES, [])
+        if not entities:
             return {}
         
-        updated_registers = [dict(reg) for reg in registers]
+        updated_entities = [dict(reg) for reg in entities]
         options_changed = False
         new_data = {}
     
         async with self._lock:
-            for idx, reg in enumerate(updated_registers):
+            for idx, reg in enumerate(updated_entities):
                 key = reg_key(reg["name"])
                 address = int(reg["address"])
                 count = int(reg.get("size", 1))
@@ -262,7 +262,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                                     if name in ("coil", "discrete") and not hasattr(result, "bits"):
                                         continue                              
                                     reg_type = name
-                                    updated_registers[idx]["register_type"] = name
+                                    updated_entities[idx]["register_type"] = name
                                     options_changed = True
                                     break
                             except Exception:
