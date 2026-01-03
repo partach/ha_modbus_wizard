@@ -27,16 +27,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         manufacturer="Partach",
         model="Wizard",
     )
-
+    hub_entity = ModbusWizardHubEntity(
+        coordinator=coordinator,
+        entry=entry,
+    )
+    async_add_entities([hub_entity])
     # Registry of active entities for this config entry
     entities: dict[str, ModbusWizardSensor] = {}
     ent_reg = er.async_get(hass)
-    entities.extend([
-        ModbusWizardHubEntity(
-            coordinator=coordinator,
-            entry=entry,
-        )
-    ])
+
     def _entity_unique_id(reg: dict[str, Any]) -> str:
         """Stable unique_id independent of display name changes."""
         return f"{entry.entry_id}_{reg['address']}_{reg.get('register_type', 'auto')}_sensor"
