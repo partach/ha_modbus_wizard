@@ -11,7 +11,7 @@ from homeassistant.helpers import selector
 from .const import (
     DOMAIN,
     CONF_UPDATE_INTERVAL,
-    CONF_REGISTERS,
+    CONF_ENTITIES,
 )
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,17 +20,17 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
         # self.config_entry = config_entry
-        self._registers: list[dict] = list(config_entry.options.get(CONF_REGISTERS, []))
+        self._entities: list[dict] = list(config_entry.options.get(CONF_ENTITIES, []))
         self._edit_index: int | None = None
         
     async def async_step_init(self, user_input=None):
             menu_options = {
                 "settings": "Settings",
-                "add_register": "Add register",
+                "add_entity": "Add Entity",
             }
-            if len(self._registers) > 0:
-                menu_options["list_registers"] = f"Registers ({len(self._registers)})"
-                menu_options["edit_register"] = "Edit register"
+            if len(self._entities) > 0:
+                menu_options["list_entities"] = f"Entities ({len(self._entities)})"
+                menu_options["edit_entity"] = "Edit Entity"
             return self.async_show_menu(
                 step_id="init",
                 menu_options=menu_options,
@@ -39,11 +39,11 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
     # Edit
     # ------------------------------------------------------------------
-    async def async_step_edit_register(self, user_input=None):
+    async def async_step_edit_entity(self, user_input=None):
         """Select which register to edit."""
         if user_input is not None:
             self._edit_index = int(user_input["register"])
-            return await self.async_step_edit_register_form()
+            return await self.async_step_edit_entity_form()
     
         # Create dropdown options: index -> display label
         options = [
@@ -51,11 +51,11 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 value=str(i),
                 label=f"{r['name']} (Address {r['address']}, {r.get('data_type', 'uint16')})"
             )
-            for i, r in enumerate(self._registers)
+            for i, r in enumerate(self._entities)
         ]
     
         return self.async_show_form(
-            step_id="edit_register",
+            step_id="edit_entity",
             data_schema=vol.Schema({
                 vol.Required("register"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
@@ -70,9 +70,9 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # EDIT REGISTER FORM
     # ------------------------------------------------------------------
     
-    async def async_step_edit_register_form(self, user_input=None):
+    async def async_step_edit_entity_form(self, user_input=None):
         """Edit the selected register."""
-        reg = self._registers[self._edit_index]
+        reg = self._entities[self._edit_index]
         errors = {}
     
         if user_input is not None:
@@ -100,8 +100,8 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             user_input["size"] = int(user_input.get("size", 1))
     
             if not errors:
-                self._registers[self._edit_index] = user_input
-                self._save_options({CONF_REGISTERS: self._registers})
+                self._entities[self._edit_index] = user_input
+                self._save_options({CONF_ENTITIES: self._entities})
                 _LOGGER.info("Register '%s' updated", user_input.get("name"))
                 return await self.async_step_init()
     
@@ -125,7 +125,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         }
 
         return self.async_show_form(
-            step_id="edit_register_form",
+            step_id="edit_entity_form",
             data_schema=self._get_register_schema(defaults),
             errors=errors,
         )
@@ -167,7 +167,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ADD REGISTER
     # ------------------------------------------------------------------
 
-    async def async_step_add_register(self, user_input=None):
+    async def async_step_add_entity(self, user_input=None):
         errors = {}
 
         if user_input is not None:
@@ -198,13 +198,13 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             
             if not errors:
                 _LOGGER.debug("Adding register: %s", user_input)
-                self._registers.append(user_input)
-                self._save_options({CONF_REGISTERS: self._registers})
-                _LOGGER.info("Register added. Total: %d", len(self._registers))
+                self._entities.append(user_input)
+                self._save_options({CONF_ENTITIES: self._entities})
+                _LOGGER.info("Register added. Total: %d", len(self._entities))
                 return await self.async_step_init()
 
         return self.async_show_form(
-            step_id="add_register",
+            step_id="add_entity",
             data_schema=self._get_register_schema(),
             errors=errors,
         )
@@ -213,18 +213,18 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # LIST / DELETE
     # ------------------------------------------------------------------
 
-    async def async_step_list_registers(self, user_input=None):
+    async def async_step_list_entities(self, user_input=None):
         """List and optionally delete registers."""
         if user_input is not None:
             delete = set(user_input.get("delete", []))
             if delete:
                 # Delete by index
-                self._registers = [
-                    r for i, r in enumerate(self._registers)
+                self._entities = [
+                    r for i, r in enumerate(self._entities)
                     if str(i) not in delete
                 ]
-                self._save_options({CONF_REGISTERS: self._registers})
-                _LOGGER.info("Deleted %d registers. Remaining: %d", len(delete), len(self._registers))
+                self._save_options({CONF_ENTITIES: self._entities})
+                _LOGGER.info("Deleted %d registers. Remaining: %d", len(delete), len(self._entities))
             return await self.async_step_init()
 
         # Create selection options with index as value
@@ -233,11 +233,11 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 value=str(i),
                 label=f"{r['name']} (Address {r['address']}, {r.get('data_type', 'uint16')})"
             )
-            for i, r in enumerate(self._registers)
+            for i, r in enumerate(self._entities)
         ]
 
         return self.async_show_form(
-            step_id="list_registers",
+            step_id="list_entities",
             data_schema=vol.Schema({
                 vol.Optional("delete"): selector.SelectSelector(
                     selector.SelectSelectorConfig(
@@ -311,7 +311,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         new_options = dict(self.config_entry.options)  # full copy
         # Update only the specified keys
         new_options.update(updates)
-        for r in self._registers:
+        for r in self._entities:
             r["address"] = int(r["address"])  # make sure we have integers for those, no floats creep through
             r["size"] = int(r.get("size", 1))
         self.hass.config_entries.async_update_entry(
