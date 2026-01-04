@@ -36,5 +36,15 @@ DEFAULT_BYTESIZE = 8
 DEFAULT_PARITY = "N"
 DEFAULT_UPDATE_INTERVAL = 10
 
+TYPE_SIZES = {
+    "uint16": 1,
+    "int16": 1,
+    "uint32": 2,
+    "int32": 2,
+    "float32": 2,
+    "uint64": 4,
+    "int64": 4,
+}
+
 def reg_key(name: str) -> str:
     return name.lower().strip().replace(" ", "_")
