@@ -27,6 +27,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
             menu_options = {
                 "settings": "Settings",
                 "add_entity": "Add Entity",
+                "load_template": "Load device template",
             }
             if len(self._entities) > 0:
                 menu_options["list_entities"] = f"Entities ({len(self._entities)})"
