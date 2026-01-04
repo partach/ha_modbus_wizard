@@ -206,19 +206,53 @@ class ModbusWizardCard extends LitElement {
         return_response: true,
       });
 
-      console.log("Read result:", result);
-
       // Check different possible response structures
-      if (result?.value !== undefined) {
-        this._writeValue = String(result.value);
-        this._selectedStatus = "Read OK";
-      } else if (result?.response?.value !== undefined) {
-        this._writeValue = String(result.response.value);
-        this._selectedStatus = "Read OK";
-      } else {
-        console.warn("Unexpected response structure:", result);
-        this._selectedStatus = "No value in response";
+      let displayValue = "";
+
+      // Extract the raw value (registers array or bits)
+      let rawData = null;
+      if (result?.value !== undefined && typeof result.value === "object") {
+        rawData = result.value;
+      } else if (result?.response?.value !== undefined && typeof result.response.value === "object") {
+        rawData = result.response.value;
       }
+
+      if (this._rawMode && rawData) {
+        // Assume rawData has .registers (array of numbers) and optionally .bits
+        const registers = rawData.registers || [];
+        const bits = rawData.bits || [];
+
+        // HEX view
+        const hex = registers.map(r => `0x${r.toString(16).toUpperCase().padStart(4, '0')}`).join(' ');
+        
+        // ASCII view (best effort)
+        let ascii = '';
+        try {
+          const bytes = new Uint8Array(registers.flatMap(r => [r >> 8, r & 0xFF]));
+          ascii = new TextDecoder('ascii', { fatal: false }).decode(bytes).replace(/\0/g, '').trim();
+          if (ascii === '') ascii = '(no printable ASCII)';
+        } catch {
+          ascii = '(invalid ASCII)';
+        }
+
+        // Binary/bitwise view
+        const binary = registers.map(r => r.toString(2).padStart(16, '0')).join(' ');
+
+        // Bits view if available
+        const bitsView = bits.length > 0 ? `Bits: [${bits.map(b => b ? 1 : 0).join(', ')}]` : '';
+
+        // Combine all
+        displayValue = `HEX: ${hex}\n ASCII: ${ascii}\n Binary: ${binary}`;
+        if (bitsView) displayValue += `\n${bitsView}`;
+        if (rawData.detected_type) displayValue += `\n Type: ${rawData.detected_type}`;
+      } else {
+        // Normal decoded value
+        const value = result?.value ?? result?.response?.value ?? null;
+        displayValue = value !== null ? String(value) : "No value";
+      }
+
+      this._writeValue = displayValue;
+      this._selectedStatus = "Read OK";
     } catch (err) {
       console.error("Read error:", err);
       this._selectedStatus = `Read failed: ${err.message || err}`;
@@ -287,8 +321,6 @@ class ModbusWizardCard extends LitElement {
                 Using device: ${this.hass.devices?.[this.config.device_id]?.name || "Modbus Device"}
                 <br>
                 Hub entity: ${this._getTargetEntity() || "Not found"}
-                <br>
-                (${this._allEntities.length} entities available)
               </div>
             ` : html`
               <select @change=${e => this._selectedEntity = e.target.value}>
@@ -300,67 +332,80 @@ class ModbusWizardCard extends LitElement {
                 `)}
               </select>
             `}
+            <div class="field-row">
+              <span class="label">Register Address:</span>
+              <input
+                type="number"
+                placeholder="e.g. 100"
+                min="0"
+                max="65535"
+                .value=${this._selectedAddress}
+                @input=${e => this._selectedAddress = Number(e.target.value)}
+              />
+            </div>
 
-            <!-- Address -->
-            <input
-              type="number"
-              placeholder="Register Address"
-              min="0"
-              max="65535"
-              .value=${this._selectedAddress}
-              @input=${e => this._selectedAddress = Number(e.target.value)}
-            />
+            <div class="field-row">
+              <span class="label">Register Category:</span>
+              <select .value=${this._registerType} @change=${e => this._registerType = e.target.value}>
+                <option value="auto">Auto-detect</option>
+                <option value="holding">Holding Register (Read/Write)</option>
+                <option value="input">Input Register (Read Only)</option>
+                <option value="coil">Coil (Digital Out)</option>
+                <option value="discrete">Discrete Input (Digital In)</option>
+              </select>
+            </div>
 
-            <!-- Register Type -->
-            <select .value=${this._registerType} @change=${e => this._registerType = e.target.value}>
-              <option value="auto">Auto</option>
-              <option value="holding">Holding</option>
-              <option value="input">Input</option>
-              <option value="coil">Coil</option>
-              <option value="discrete">Discrete</option>
-            </select>
+            <div class="field-row">
+              <span class="label">Data Format:</span>
+              <select .value=${this._dataType} @change=${this._handleDataTypeChange}>
+                <option value="uint16">16-bit Unsigned (uint16)</option>
+                <option value="int16">16-bit Signed (int16)</option>
+                <option value="uint32">32-bit Unsigned (uint32)</option>
+                <option value="int32">32-bit Signed (int32)</option>
+                <option value="float32">32-bit Float (float32)</option>
+                <option value="uint64">64-bit Unsigned (uint64)</option>
+                <option value="int64">64-bit Signed (int64)</option>
+                <option value="string">Character String</option>
+              </select>
+            </div>
 
-            <!-- Data Type -->
-            <select .value=${this._dataType} @change=${this._handleDataTypeChange}>
-              <option value="uint16">uint16</option>
-              <option value="int16">int16</option>
-              <option value="uint32">uint32</option>
-              <option value="int32">int32</option>
-              <option value="float32">float32</option>
-              <option value="uint64">uint64</option>
-              <option value="int64">int64</option>
-              <option value="string">string</option>
-            </select>
+            <div class="field-row">
+              <span class="label">Register Count (Size):</span>
+              <input
+                type="number"
+                placeholder="1"
+                min="1"
+                max="20"
+                .value=${this._selectedSize}
+                @input=${e => this._selectedSize = Number(e.target.value)}
+              />
+            </div>
 
-            <!-- Size (override auto) -->
-            <input
-              type="number"
-              placeholder="Size"
-              min="1"
-              max="20"
-              .value=${this._selectedSize}
-              @input=${e => this._selectedSize = Number(e.target.value)}
-            />
 
-            <!-- Byte Order -->
-            <select .value=${this._byteOrder} @change=${e => this._byteOrder = e.target.value}>
-              <option value="big">Byte Order: Big</option>
-              <option value="little">Byte Order: Little</option>
-            </select>
+            <div class="field-row">
+              <span class="label">Endianness (Byte):</span>
+              <select .value=${this._byteOrder} @change=${e => this._byteOrder = e.target.value}>
+                <option value="big">Big Endian (ABCD)</option>
+                <option value="little">Little Endian (DCBA)</option>
+              </select>
+            </div>
 
-            <!-- Word Order -->
-            <select .value=${this._wordOrder} @change=${e => this._wordOrder = e.target.value}>
-              <option value="big">Word Order: Big</option>
-              <option value="little">Word Order: Little</option>
-            </select>
+            <div class="field-row">
+              <span class="label">Endianness (Word):</span>
+              <select .value=${this._wordOrder} @change=${e => this._wordOrder = e.target.value}>
+                <option value="big">Big Word (Most Significant First)</option>
+                <option value="little">Little Word (Least Significant First)</option>
+              </select>
+            </div>
 
-            <!-- Raw Mode -->
-            <label>
-              <input type="checkbox" @change=${e => this._rawMode = e.target.checked} ?checked=${this._rawMode} />
-              Raw Mode
-            </label>
+            <div class="field-row checkbox-row">
+              <span class="label">Bypass Processing:</span>
+              <label>
+                <input type="checkbox" @change=${e => this._rawMode = e.target.checked} ?checked=${this._rawMode} />
+                Enable Raw Mode
+              </label>
+            </div>
 
-            <!-- Value Display / Input -->
             <input
               type="text"
               placeholder="Value"
@@ -368,7 +413,6 @@ class ModbusWizardCard extends LitElement {
               @input=${e => this._writeValue = e.target.value}
             />
 
-            <!-- Buttons -->
             <div class="button-row">
               <button @click=${this._sendRead}>Read</button>
               <button @click=${this._sendWrite}>Write</button>
@@ -452,6 +496,33 @@ class ModbusWizardCard extends LitElement {
         padding: 8px;
         background: var(--secondary-background-color);
         border-radius: 4px;
+      }
+      .field-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .label {
+        width: 160px; /* Fixed width ensures all inputs align vertically */
+        font-weight: bold;
+        font-size: 0.9em;
+        color: var(--primary-text-color);
+      }
+
+      input, select {
+        flex: 1; /* Makes the input fill the remaining space */
+        padding: 4px;
+        border: 1px solid var(--divider-color);
+        border-radius: 4px;
+        background: var(--card-background-color);
+        color: var(--primary-text-color);
+      }
+
+      .checkbox-row label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
       }
     `;
   }
