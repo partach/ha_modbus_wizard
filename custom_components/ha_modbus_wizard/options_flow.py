@@ -255,34 +255,108 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
     async def async_step_load_template(self, user_input=None):
         if user_input is not None:
-            template_file = f"custom_components/{DOMAIN}/templates/{user_input['template']}.json"
+            template_name = user_input["template"]
+            template_path = self.hass.config.path(
+                "custom_components", DOMAIN, "templates", f"{template_name}.json"
+            )
+    
             try:
                 template_data = await self.hass.async_add_executor_job(
-                    json.load, open(self.hass.config.path(template_file))
+                    _load_template_file, template_path
                 )
-                self._entities.extend(template_data)
-                self._save_options({CONF_ENTITIES: self._entities})
+    
+                if not isinstance(template_data, list):
+                    raise ValueError("Template must be a list")
+    
+                existing_keys = {
+                    (r.get("name"), r.get("address"))
+                    for r in self._registers
+                }
+    
+                added = 0
+                for reg in template_data:
+                    if not isinstance(reg, dict):
+                        continue
+                    if "name" not in reg or "address" not in reg:
+                        continue
+    
+                    key = (reg["name"], reg["address"])
+                    if key in existing_keys:
+                        continue
+    
+                    self._registers.append(reg)
+                    existing_keys.add(key)
+                    added += 1
+    
+                if not added:
+                    return self.async_show_form(
+                        step_id="load_template",
+                        errors={"base": "template_empty_or_duplicate"},
+                    )
+    
+                self._save()
                 return await self.async_step_init()
+    
+            except FileNotFoundError:
+                return self.async_show_form(
+                    step_id="load_template",
+                    errors={"base": "template_not_found"},
+                )
+            except json.JSONDecodeError:
+                return self.async_show_form(
+                    step_id="load_template",
+                    errors={"base": "invalid_template"},
+                )
             except Exception as err:
-                _LOGGER.error("Failed to load template: %s", err)
-                return self.async_show_form(step_id="load_template", errors={"base": "load_failed"})
-        
-        # List available templates (scan folder or hardcode)
-        templates = ["sdm630", "other_device"]  # or os.list_dir
-        options = [selector.SelectOptionDict(value=t, label=t.upper().replace('_', ' ')) for t in templates]
-        
+                _LOGGER.error("Failed to load template %s: %s", template_name, err)
+                return self.async_show_form(
+                    step_id="load_template",
+                    errors={"base": "load_failed"},
+                )
+    
+        # ---- List templates ----
+        templates_dir = self.hass.config.path(
+            "custom_components", DOMAIN, "templates"
+        )
+    
+        try:
+            templates = sorted(
+                f[:-5]
+                for f in os.listdir(templates_dir)
+                if f.endswith(".json")
+            )
+        except Exception:
+            templates = []
+    
+        if not templates:
+            return self.async_abort(reason="no_templates")
+    
         return self.async_show_form(
             step_id="load_template",
             data_schema=vol.Schema({
                 vol.Required("template"): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(
+                                value=t,
+                                label=t.replace("_", " ").title(),
+                            )
+                            for t in templates
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
                 )
-            })
+            }),
         )
+
     
     # ------------------------------------------------------------------
     # HELPERS
     # ------------------------------------------------------------------
+    def _load_template_file(path: str):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+            
     def _get_register_schema(self, defaults: dict | None = None) -> vol.Schema:
         """Get the register form schema with optional defaults."""
         defaults = defaults or {}
