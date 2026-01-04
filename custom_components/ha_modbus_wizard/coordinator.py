@@ -230,7 +230,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             for idx, reg in enumerate(updated_entities):
                 key = reg_key(reg["name"])
                 address = int(reg["address"])
-                count = int(reg.get("size", TYPE_SIZES.get(reg["data_type"], 1)))
+                count = int(TYPE_SIZES.get(reg["data_type"].lower(), 1))
                 reg_type = reg.get("register_type", "holding")
     
                 result = None
@@ -357,6 +357,22 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
                 if dt == "int16" and decoded > 32767:
                     decoded = decoded - 65536
             else:
+                expected = TYPE_SIZES.get(dt)
+                if expected and len(values) != expected:
+                    _LOGGER.warning(
+                        "Register size mismatch for %s at addr %s: got %d, expected %d — correcting",
+                        data_type,
+                        reg.get("address") if reg else "unknown",
+                        len(values),
+                        expected,
+                    )
+                
+                    # If too few registers, cannot fix
+                    if len(values) < expected:
+                        return None
+                
+                    # Too many registers → trim
+                    values = values[:expected]
                 # For multi-register types, use convert_from_registers
                 # Map data_type to DATATYPE enum
                 dt_map = {
