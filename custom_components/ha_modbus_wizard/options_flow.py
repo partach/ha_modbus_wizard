@@ -261,7 +261,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # Load Template
     # ------------------------------------------------------------------
     async def async_step_load_template(self, user_input=None):
-        if user_input is not None:
+        if user_input and "template" in user_input:
             template_name = user_input["template"]
             template_path = self.hass.config.path(
                 "custom_components", DOMAIN, "templates", f"{template_name}.json"
@@ -277,7 +277,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     
                 existing_keys = {
                     (r.get("name"), r.get("address"))
-                    for r in self._registers
+                    for r in self._entities
                 }
     
                 added = 0
@@ -290,8 +290,9 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                     key = (reg["name"], reg["address"])
                     if key in existing_keys:
                         continue
-    
-                    self._registers.append(reg)
+                    reg["address"] = int(reg["address"]) # make sure these are integers
+                    reg["size"] = int(reg.get("size", 1))
+                    self._entities.append(reg)
                     existing_keys.add(key)
                     added += 1
     
@@ -301,7 +302,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                         errors={"base": "template_empty_or_duplicate"},
                     )
     
-                self._save()
+                self._save_options({CONF_ENTITIES: self._entities})
                 return await self.async_step_init()
     
             except FileNotFoundError:
