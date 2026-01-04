@@ -253,6 +253,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
     # template HELPERS
     # ------------------------------------------------------------------
+    @staticmethod
     def _load_template_file(path: str):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -268,7 +269,7 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     
             try:
                 template_data = await self.hass.async_add_executor_job(
-                    _load_template_file, template_path
+                    self._load_template_file, template_path
                 )
     
                 if not isinstance(template_data, list):
