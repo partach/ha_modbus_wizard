@@ -168,6 +168,4 @@
     "word_order": "big",
     "allow_bits": false
   },
-  // Add more as needed, e.g., frequency at 70, power factor at 18-30, etc.
-  // Full map from Eastron docs: voltages 0-4, currents 6-10, powers 12-52, energies 72-342
 ]
