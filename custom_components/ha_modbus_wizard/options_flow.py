@@ -4,6 +4,7 @@ import logging
 import json
 from datetime import timedelta
 import voluptuous as vol
+import os
 
 from homeassistant import config_entries
 from homeassistant.helpers import selector
@@ -249,7 +250,12 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
                 )
             }),
         )
-
+    # ------------------------------------------------------------------
+    # template HELPERS
+    # ------------------------------------------------------------------
+    def _load_template_file(path: str):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
     # ------------------------------------------------------------------
     # Load Template
     # ------------------------------------------------------------------
@@ -353,9 +359,6 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
     # ------------------------------------------------------------------
     # HELPERS
     # ------------------------------------------------------------------
-    def _load_template_file(path: str):
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
             
     def _get_register_schema(self, defaults: dict | None = None) -> vol.Schema:
         """Get the register form schema with optional defaults."""
