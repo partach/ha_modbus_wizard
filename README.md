@@ -14,7 +14,7 @@
 Modbus Wizard lets you discover, test, and integrate Modbus devices (serial or TCP/UDP) directly in Home Assistant — all through a simple, powerful interface.
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/ha-modbus-wizard-config-6.png" width="600" alt="Runtime entity configuration"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/ha-modbus-wizard-config-6.png" width="600" alt="Runtime entity configuration"/>
   <br><em>Add and configure sensors at runtime — no reboots required</em>
 </p>
 
@@ -27,13 +27,14 @@ Modbus Wizard lets you discover, test, and integrate Modbus devices (serial or T
 - **Runtime entity management** — add, edit, or remove sensors without restarting HA
 - Dedicated **Lovelace card** for live reading/writing any register (perfect for testing and debugging)
 - Create only the entities you need — keep your setup clean and efficient
-- Multiple devices supported simultaneously
+- **Multiple slaves** supported (up to 255 per bus/network) with individual slave IDs
+- **Multiple masters** possible (HA as master; coexists with other masters if no conflicts)
 - Configurable refresh intervals per device
 - Full automation support — use sensors in automations, scripts, and dashboards
-- Advanced options: scaling, offset, byte/word order, bit handling, and more
+- Advanced options: scaling, offset, byte/word order, endianness, bit handling, and more
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-card.png" width="350" alt="Modbus Wizard Card"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/HA-modbus-wizard-card.png" width="350" alt="Modbus Wizard Card"/>
   <br><em>Probe and control any register in real-time with the included card</em>
 </p>
 
@@ -57,6 +58,15 @@ Once available in HACS default repository, install with one click.
 
 ## Setup Guide
 
+### RS485 Termination Note
+For reliable serial Modbus (RS485), install **120Ω termination resistors** at **both ends** of the bus only.  
+Too many resistors degrade the signal; none can cause reflections and errors.
+
+<p align="center">
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/120ohm.png" width="600" alt="120 ohm"/>
+  <br><em>how to apply the 120 ohm resistor with multiple devices attached on the bus</em>
+</p>
+
 ### Step 1: Add Your Modbus Device
 1. Click **+ Add Integration** → Choose **Modbus Wizard**
 2. Select connection type: **Serial** or **IP (TCP/UDP)**
@@ -70,9 +80,9 @@ Once available in HACS default repository, install with one click.
 → Success? You're ready!
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-2.png" width="200" alt="Step 1"/>
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-3.png" width="200" alt="Step 2"/>
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-1.png" width="600" alt="Step 3"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/HA-modbus-wizard-config-2.png" width="200" alt="Step 1"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/HA-modbus-wizard-config-3.png" width="200" alt="Step 2"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/HA-modbus-wizard-config-1.png" width="600" alt="Step 3"/>
   <br><em>Simple 3-step device setup</em>
 </p>
 
@@ -95,13 +105,39 @@ Once you know which registers you want:
 - Advanced options available (click "Show advanced options")
 
 <p align="center">
-  <img src="https://github.com/partach/ha_modbus_wizard/blob/main/HA-modbus-wizard-config-5.png" width="400" alt="Add register form"/>
+  <img src="https://github.com/partach/ha_modbus_wizard/raw/main/HA-modbus-wizard-config-5.png" width="400" alt="Add register form"/>
   <br><em>Full control over sensor configuration</em>
 </p>
 
-Your new sensors appear immediately — no restart needed.
-
+Your new sensors appear immediately — no restart needed.  
 You can later edit or delete them from the same options menu.
+
+## Register Configuration Fields
+
+When adding or editing a register, the following fields are available:
+
+| Field              | Required | Default       | Description                                                                                                      |
+|--------------------|----------|---------------|------------------------------------------------------------------------------------------------------------------|
+| **name**           | Yes      | -             | Human-readable name for the entity                                                                               |
+| **address**        | Yes      | -             | Modbus register address (0–65535)                                                                                |
+| **data_type**      | Yes      | `uint16`      | How to decode the value: `uint16`, `int16`, `uint32`, `int32`, `float32`, `uint64`, `int64`                        |
+| **register_type**  | Yes      | `input`       | Function code: `auto`, `holding`, `input`, `coil`, `discrete`                                                    |
+| **rw**             | Yes      | `read`        | Entity type: `read` (sensor), `write` (number), `rw` (both)                                                       |
+| **unit**           | No       | -             | Unit of measurement (e.g., "V", "A", "W")                                                                        |
+| **scale**          | No       | `1.0`         | Multiplier applied after decoding (`value × scale + offset`)                                                     |
+| **offset**         | No       | `0.0`         | Additive offset after scaling                                                                                    |
+| **options**        | No       | -             | JSON mapping for select entity (e.g., `{"0": "Off", "1": "On"}`)                                                 |
+| **byte_order**     | No       | `big`         | Byte order within each word (big/little)                                                                         |
+| **word_order**     | No       | `big`         | Order of the 16-bit words (big/little) for multi-register values                                                 |
+| **allow_bits**     | No       | `False`       | Allow coil/discrete attempts during auto-detection                                                               |
+| **min**            | No       | -             | Minimum value for writeable number entities                                                                       |
+| **max**            | No       | -             | Maximum value for writeable number entities                                                                       |
+| **step**           | No       | `1.0`         | Step size for number entity adjustments                                                                          |
+
+### Quick Tips for Common Use Cases
+- **Voltages/Currents**: `data_type = "uint16"`, `scale = 0.1` or `0.01`, unit "V"/"A"
+- **Power**: Often `uint32` or `float32` with appropriate scaling
+- **Status bits**: Use `coil`/`discrete` + `options` JSON for friendly names
 
 ## Why Choose Modbus Wizard?
 
@@ -110,37 +146,10 @@ You can later edit or delete them from the same options menu.
 - **Beginner-friendly** yet powerful for advanced users
 - **Full control** — bit-level access, custom scaling, endianness, raw mode
 
-
-
-#### Modbus Wizard Register Configuration Fields
-
-When adding or editing a register in the Modbus Wizard integration, the following fields are available:
-
-| Field             | Type / Default              | What to Enter                                                                 | Purpose / Effect                                                                                                                       |
-|-------------------|-----------------------------|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| **name**          | Required string             | Human-readable name (e.g., "Phase 1 Voltage")                                 | Displayed as the entity name in Home Assistant. Also used to generate the unique data key.                                          |
-| **address**       | Required number (0–65535)   | Modbus register address in decimal                                            | The register address to read/write on the device.                                                                                      |
-| **data_type**     | Required dropdown, default `uint16` | `uint16`, `int16`, `uint32`, `int32`, `float32`, `uint64`, `int64`            | How to interpret the raw register(s). Automatically sets the number of registers to read (`size`).                                   |
-| **register_type** | Required dropdown, default `auto` | `auto`, `holding`, `input`, `coil`, `discrete`                                | Modbus function code to use. `auto` tries holding → input → coil → discrete until successful.                                        |
-| **rw**            | Required dropdown, default `read` | `read`, `write`, `rw`                                                         | Controls entity type: read-only sensor, writeable number entity, or both.                                                              |
-| **unit**          | Optional string             | Unit of measurement (e.g., "V", "A", "W", "kWh", "%")                         | Shown in Home Assistant (unit_of_measurement). Helps with grouping and display.                                                        |
-| **scale**         | Optional float, default `1.0` | Multiplier (e.g., `0.01` for divide-by-100, `10` for multiply-by-10)          | Applied after decoding: `final_value = decoded × scale + offset`. Very common for scaled integers.                                    |
-| **offset**        | Optional float, default `0.0` | Additive offset (e.g., `-40` for temperature sensors)                         | `final_value = decoded × scale + offset`.                                                                                              |
-| **options**       | Optional string (JSON)      | JSON mapping, e.g. `{"0": "Off", "1": "On", "2": "Auto"}`                      | Creates a select entity with friendly labels instead of raw numeric values.                                                            |
-| **byte_order**    | Optional dropdown, default `big` | `big` or `little`                                                             | Byte order inside each 16-bit word (for multi-register types like uint32/float32).                                                    |
-| **word_order**    | Optional dropdown, default `big` | `big` or `little`                                                             | Order of the 16-bit words (high word first or low word first) for multi-register values.                                               |
-| **allow_bits**    | Optional boolean, default `False` | Check to allow testing coil/discrete registers during auto-detection          | Enables coil/discrete attempts when `register_type` is `auto`.                                                                        |
-| **min**           | Optional float              | Minimum value for a writeable number entity                                   | Lower bound for the number input slider in the UI.                                                                                     |
-| **max**           | Optional float              | Maximum value for a writeable number entity                                   | Upper bound for the number input slider in the UI.                                                                                     |
-| **step**          | Optional float, default `1` | Step size for number entity (e.g., `0.1`, `1`, `10`)                           | Controls granularity of adjustments in the Home Assistant UI.                                                                          |
-
-### Quick Tips for Common Use Cases
-- **Voltages/Currents**: `data_type = "uint16"`, `scale = 0.01` or `0.1`, appropriate `unit`.
-- **Power (W or kW)**: Often `uint16` or `uint32` with `scale = 1` or `10`.
-- **True floating-point values**: Use `float32` (reads 2 registers) and correct `byte_order`/`word_order`.
-- **Status bits**: Use `coil` or `discrete` with `options` JSON for friendly names.
-
-These fields give full flexibility for virtually any Modbus device!
+## Roadmap & Planned Features
+- **Templates for common devices**: Pre-load register sets for popular boards like WaveShare RS485 series (save typing, reduce errors)
+- **Enhanced card display**: HEX, ASCII, and bitwise views for raw register data
+- **Diagnostic export**: One-click YAML/JSON report of all registers and values for troubleshooting
 
 ## Support & Feedback
 
@@ -148,19 +157,19 @@ This integration is under active development. Found a bug? Have a feature reques
 
 → Open an issue on GitHub: https://github.com/partach/ha_modbus_wizard/issues
 
-Contributions welcome, see below!
+Contributions welcome!
+
+### Discussion
+Join the conversation: [GitHub Discussions](https://github.com/partach/ha_modbus_wizard/discussions)
+
+### Changelog
+See [CHANGELOG.md](https://github.com/partach/ha_modbus_wizard/blob/main/CHANGELOG.md)
+
+### Support Development
+If you find Modbus Wizard useful, consider buying me a coffee! ☕
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg?style=flat-square)](https://paypal.me/therealbean)
 
 ---
 
 **Made with ❤️ for the Home Assistant community**
-
-## Discussion 
-Once requests are there will be opened here: [here](https://github.com/partach/ha_modbus_wizard/discussions)
-
-## Changelog
-See [CHANGELOG.md](https://github.com/partach/ha_modbus_wizard/blob/main/CHANGELOG.md)
-
-## Support development
-If you like it and find it usefull, or want to support this and future developments, it would be greatly appreciated :)
-
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg?style=flat-square)](https://paypal.me/therealbean)
