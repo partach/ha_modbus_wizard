@@ -23,6 +23,7 @@ Modbus Wizard lets you discover, test, and integrate Modbus devices (serial or T
 ## Features
 
 - **Zero YAML configuration** — everything done via the Home Assistant UI
+- Device templates support! Just present your device as a json template! (see below)
 - Full support for **serial (RS485/USB)** and **IP-based Modbus (TCP & UDP)**
 - **Runtime entity management** — add, edit, or remove sensors without restarting HA
 - Dedicated **Lovelace card** for live reading/writing any register (perfect for testing and debugging)
@@ -111,6 +112,32 @@ Once you know which registers you want:
 
 Your new sensors appear immediately — no restart needed.  
 You can later edit or delete them from the same options menu.
+
+## Device Templates
+Via the hub configuration (gear symbol) you can read device templates (in standard JSON format).
+These are easy to make (AI can be your friend) and help you import your device (or change) run-time with a few clicks.
+SDM630 basic profile is provided in the code. Just feed this to Grok, ChatGPT, Claude, etc. And ask to get this for device X/Y.
+Then add to the template directory of the integration `/custom_components/ha_modbus_wizard/templates/mydevicename.json
+Also send them to me so i can possibly add them for a next release :)
+
+The Format (entry per register)
+```
+[
+  {
+    "name": "Phase 1 Voltage",
+    "address": 0,
+    "data_type": "float32",
+    "register_type": "input",
+    "rw": "read",
+    "unit": "V",
+    "scale": 1.0,
+    "offset": 0.0,
+    "byte_order": "big",
+    "word_order": "big",
+    "allow_bits": false
+  }
+]
+```
 
 ## Register Configuration Fields
 
