@@ -250,6 +250,36 @@ class ModbusWizardOptionsFlow(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------
+    # Load Template
+    # ------------------------------------------------------------------
+    async def async_step_load_template(self, user_input=None):
+        if user_input is not None:
+            template_file = f"custom_components/{DOMAIN}/templates/{user_input['template']}.json"
+            try:
+                template_data = await self.hass.async_add_executor_job(
+                    json.load, open(self.hass.config.path(template_file))
+                )
+                self._entities.extend(template_data)
+                self._save_options({CONF_ENTITIES: self._entities})
+                return await self.async_step_init()
+            except Exception as err:
+                _LOGGER.error("Failed to load template: %s", err)
+                return self.async_show_form(step_id="load_template", errors={"base": "load_failed"})
+        
+        # List available templates (scan folder or hardcode)
+        templates = ["sdm630", "other_device"]  # or os.list_dir
+        options = [selector.SelectOptionDict(value=t, label=t.upper().replace('_', ' ')) for t in templates]
+        
+        return self.async_show_form(
+            step_id="load_template",
+            data_schema=vol.Schema({
+                vol.Required("template"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
+                )
+            })
+        )
+    
+    # ------------------------------------------------------------------
     # HELPERS
     # ------------------------------------------------------------------
     def _get_register_schema(self, defaults: dict | None = None) -> vol.Schema:
