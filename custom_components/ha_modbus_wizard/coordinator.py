@@ -8,7 +8,11 @@ from typing import Any
 from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from .const import CONF_ENTITIES, reg_key
+from .const import (
+    CONF_ENTITIES, 
+    TYPE_SIZES,
+    reg_key,
+)
 from pymodbus.client.mixin import ModbusClientMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -124,14 +128,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
 
         # Determine size from data_type if not provided
         if size is None:
-            type_sizes = {
-                "uint16": 1, "int16": 1,
-                "uint32": 2, "int32": 2, "float32": 2,
-                "uint64": 4, "int64": 4,
-            }
-            size = type_sizes.get(data_type.lower(), 1)
-
-
+            size = int(TYPE_SIZES.get(data_type.lower(), 1))
         result = None
 
         # === AUTO DETECTION ===
@@ -233,7 +230,7 @@ class ModbusWizardCoordinator(DataUpdateCoordinator):
             for idx, reg in enumerate(updated_entities):
                 key = reg_key(reg["name"])
                 address = int(reg["address"])
-                count = int(reg.get("size", 1))
+                count = int(reg.get("size", TYPE_SIZES.get(reg["data_type"], 1)))
                 reg_type = reg.get("register_type", "holding")
     
                 result = None
