@@ -1,5 +1,9 @@
 # Modbus Wizard
 
+There is an upgraded integration has this one included <br>
+Therefor expect this one to be less maintained.<br>
+Please use: https://github.com/partach/protocol_wizard
+
 [![Home Assistant](https://img.shields.io/badge/Home_Assistant-00A1DF?style=flat-square&logo=home-assistant&logoColor=white)](https://www.home-assistant.io)
 [![HACS](https://img.shields.io/badge/HACS-Default-41BDF5?style=flat-square)](https://hacs.xyz)
 [![HACS Action](https://img.shields.io/github/actions/workflow/status/partach/ha_modbus_wizard/validate-hacs.yml?label=HACS%20Action&style=flat-square)](https://github.com/partach/ha_modbus_wizard/actions)
